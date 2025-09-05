@@ -116,7 +116,7 @@ export default function NotificationsPage() {
               )}
             </CardTitle>
             <CardDescription>
-              You'll receive notifications for breaking news and new articles in your interests.
+              You&apos;ll receive notifications for breaking news and new articles in your interests.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -138,7 +138,7 @@ export default function NotificationsPage() {
                 <Bell className="h-12 w-12 mx-auto text-gray-400" />
                 <h3 className="mt-4 text-lg font-medium text-gray-900">No notifications</h3>
                 <p className="mt-1 text-gray-500">
-                  You're all caught up! Check back later for updates.
+                  You&apos;re all caught up! Check back later for updates.
                 </p>
               </div>
             ) : (

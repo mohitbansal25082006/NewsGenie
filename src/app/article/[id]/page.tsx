@@ -1,7 +1,6 @@
 // E:\newsgenie\src\app\article\[id]\page.tsx
 'use client';
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +29,13 @@ interface Article {
   keywords?: string[];
 }
 
+interface Bookmark {
+  id: string;
+  articleId: string;
+  userId: string;
+  createdAt: string;
+}
+
 export default function ArticlePage() {
   const { data: session } = useSession();
   const params = useParams();
@@ -42,17 +48,7 @@ export default function ArticlePage() {
   const [relatedLoading, setRelatedLoading] = useState(true);
   const [bookmarked, setBookmarked] = useState(false);
   
-  useEffect(() => {
-    if (articleId) {
-      fetchArticle();
-      fetchRelatedArticles();
-      if (session) {
-        checkBookmarkStatus();
-      }
-    }
-  }, [articleId, session]);
-  
-  const fetchArticle = async () => {
+  const fetchArticle = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/article/${articleId}`);
@@ -74,9 +70,9 @@ export default function ArticlePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [articleId, session, router]);
   
-  const fetchRelatedArticles = async () => {
+  const fetchRelatedArticles = useCallback(async () => {
     setRelatedLoading(true);
     try {
       const response = await fetch(`/api/article/${articleId}/related`);
@@ -89,19 +85,29 @@ export default function ArticlePage() {
     } finally {
       setRelatedLoading(false);
     }
-  };
+  }, [articleId]);
   
-  const checkBookmarkStatus = async () => {
+  const checkBookmarkStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/bookmarks');
       if (response.ok) {
-        const bookmarks = await response.json();
-        setBookmarked(bookmarks.some((b: any) => b.articleId === articleId));
+        const bookmarks: Bookmark[] = await response.json();
+        setBookmarked(bookmarks.some((b: Bookmark) => b.articleId === articleId));
       }
     } catch (error) {
       console.error('Error checking bookmark status:', error);
     }
-  };
+  }, [articleId]);
+  
+  useEffect(() => {
+    if (articleId) {
+      fetchArticle();
+      fetchRelatedArticles();
+      if (session) {
+        checkBookmarkStatus();
+      }
+    }
+  }, [articleId, session, fetchArticle, fetchRelatedArticles, checkBookmarkStatus]);
   
   const toggleBookmark = async () => {
     if (!session) {
@@ -201,7 +207,7 @@ export default function ArticlePage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Article Not Found</h1>
-          <p className="text-gray-600 mb-4">The article you're looking for doesn't exist.</p>
+          <p className="text-gray-600 mb-4">The article you&apos;re looking for doesn&apos;t exist.</p>
           <Button onClick={() => router.push('/')}>
             Go to Homepage
           </Button>

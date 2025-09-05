@@ -9,6 +9,15 @@ export interface NotificationData {
   articleId?: string;
 }
 
+// Define Article interface based on your Prisma schema
+export interface Article {
+  id: string;
+  title: string;
+  category: string;
+  country?: string | null;
+  // Add other article properties as needed
+}
+
 export async function createNotification(data: NotificationData) {
   try {
     const notification = await prisma.notification.create({
@@ -28,7 +37,7 @@ export async function createNotification(data: NotificationData) {
 }
 
 // Function to send breaking news notification to users who have enabled it
-export async function sendBreakingNewsNotification(article: any) {
+export async function sendBreakingNewsNotification(article: Article) {
   try {
     // Get users who have enabled breaking news notifications
     const users = await prisma.userPreference.findMany({
@@ -42,7 +51,10 @@ export async function sendBreakingNewsNotification(article: any) {
 
     for (const userPref of users) {
       // Check if the article matches the user's interests or country
-      if (userPref.interests.includes(article.category) || userPref.country === article.country) {
+      const matchesInterest = userPref.interests.includes(article.category);
+      const matchesCountry = userPref.country === article.country;
+      
+      if (matchesInterest || matchesCountry) {
         await createNotification({
           userId: userPref.userId,
           title: "Breaking News",
@@ -58,7 +70,7 @@ export async function sendBreakingNewsNotification(article: any) {
 }
 
 // Function to send new article notification to users who have enabled it
-export async function sendNewArticleNotification(article: any) {
+export async function sendNewArticleNotification(article: Article) {
   try {
     // Get users who have enabled new article notifications
     const users = await prisma.userPreference.findMany({
@@ -72,7 +84,10 @@ export async function sendNewArticleNotification(article: any) {
 
     for (const userPref of users) {
       // Check if the article matches the user's interests or country
-      if (userPref.interests.includes(article.category) || userPref.country === article.country) {
+      const matchesInterest = userPref.interests.includes(article.category);
+      const matchesCountry = userPref.country === article.country;
+      
+      if (matchesInterest || matchesCountry) {
         await createNotification({
           userId: userPref.userId,
           title: "New Article",
@@ -88,7 +103,7 @@ export async function sendNewArticleNotification(article: any) {
 }
 
 // Function to send daily digest notifications
-export async function sendDailyDigestNotification(userId: string, articles: any[]) {
+export async function sendDailyDigestNotification(userId: string, articles: Article[]) {
   try {
     const userPref = await prisma.userPreference.findUnique({
       where: { userId },

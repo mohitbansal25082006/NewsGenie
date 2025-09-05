@@ -1,6 +1,5 @@
 // E:\newsgenie\src\app\dashboard\preferences\page.tsx
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
@@ -10,16 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'react-hot-toast';
 import { Loader2, Save, Plus, X, Info, Clock, Bell, Mail, Globe, BookOpen } from 'lucide-react';
-
 const CATEGORIES = [
   'general', 'business', 'entertainment', 'health', 
   'science', 'sports', 'technology'
 ];
-
 const LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Spanish' },
@@ -31,7 +27,6 @@ const LANGUAGES = [
   { value: 'ja', label: 'Japanese' },
   { value: 'zh', label: 'Chinese' },
 ];
-
 const COUNTRIES = [
   { value: 'us', label: 'United States' },
   { value: 'gb', label: 'United Kingdom' },
@@ -44,12 +39,10 @@ const COUNTRIES = [
   { value: 'br', label: 'Brazil' },
   { value: 'ru', label: 'Russia' },
 ];
-
 const POPULAR_SOURCES = [
   'bbc-news', 'cnn', 'fox-news', 'the-wall-street-journal', 'the-new-york-times',
   'reuters', 'associated-press', 'bloomberg', 'the-washington-post', 'nbc-news'
 ];
-
 export default function PreferencesPage() {
   const { data: session, status } = useSession();
   const [loading, setLoading] = useState(true);
@@ -230,7 +223,7 @@ export default function PreferencesPage() {
                   Your Interests
                 </CardTitle>
                 <CardDescription>
-                  Select topics you're interested in to personalize your news feed.
+                  Select topics you&apos;re interested in to personalize your news feed.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -284,7 +277,7 @@ export default function PreferencesPage() {
                   News Sources
                 </CardTitle>
                 <CardDescription>
-                  Select your preferred news sources. If none are selected, we'll show articles from all sources.
+                  Select your preferred news sources. If none are selected, we&apos;ll show articles from all sources.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -335,7 +328,7 @@ export default function PreferencesPage() {
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Globe className="h-5 w-5 mr-2" />
-                  Language & Region
+                  Language &amp; Region
                 </CardTitle>
                 <CardDescription>
                   Set your preferred language and region for news content.
@@ -404,7 +397,7 @@ export default function PreferencesPage() {
                     <span className="text-sm text-gray-600">articles</span>
                   </div>
                   <p className="text-xs text-gray-500">
-                    We'll show you up to this many articles per day in your feed.
+                    We&apos;ll show you up to this many articles per day in your feed.
                   </p>
                 </div>
               </CardContent>
@@ -420,7 +413,7 @@ export default function PreferencesPage() {
                   Notification Settings
                 </CardTitle>
                 <CardDescription>
-                  Choose which notifications you'd like to receive.
+                  Choose which notifications you&apos;d like to receive.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -436,7 +429,6 @@ export default function PreferencesPage() {
                     onCheckedChange={setNotifyBreakingNews}
                   />
                 </div>
-
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium">New Articles</h4>
@@ -449,7 +441,6 @@ export default function PreferencesPage() {
                     onCheckedChange={setNotifyNewArticles}
                   />
                 </div>
-
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium">Daily Digest</h4>
@@ -476,7 +467,7 @@ export default function PreferencesPage() {
                       <Clock className="h-4 w-4 text-gray-500" />
                     </div>
                     <p className="text-xs text-gray-500">
-                      You'll receive your daily digest at this time.
+                      You&apos;ll receive your daily digest at this time.
                     </p>
                   </div>
                 )}
@@ -515,7 +506,7 @@ export default function PreferencesPage() {
                       <div>
                         <h4 className="font-medium text-blue-800">Email Notifications</h4>
                         <p className="text-sm text-blue-700 mt-1">
-                          We'll send notifications to your registered email address: {session?.user?.email}
+                          We&apos;ll send notifications to your registered email address: {session?.user?.email}
                         </p>
                       </div>
                     </div>
@@ -568,7 +559,7 @@ export default function PreferencesPage() {
                     <div>
                       <h4 className="font-medium text-yellow-800">Data Deletion</h4>
                       <p className="text-sm text-yellow-700 mt-1">
-                        If you'd like to delete your account and all associated data, please contact support.
+                        If you&apos;d like to delete your account and all associated data, please contact support.
                       </p>
                     </div>
                   </div>
