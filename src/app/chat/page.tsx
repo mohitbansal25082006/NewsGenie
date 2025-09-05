@@ -1,6 +1,5 @@
 // E:\newsgenie\src\app\chat\page.tsx
 'use client';
-
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
@@ -24,11 +23,21 @@ import {
   Trash2,
   Clock,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  ThumbsUp,
+  ThumbsDown,
+  Globe,
+  Search,
+  Sparkles,
+  Lightbulb,
+  TrendingUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Conversation {
   id: string;
@@ -40,6 +49,7 @@ interface Conversation {
     role: 'user' | 'assistant';
     content: string;
     createdAt: string;
+    sources?: string[];
   }[];
 }
 
@@ -66,7 +76,10 @@ export default function ChatPage() {
   const [briefing, setBriefing] = useState<BriefingData | null>(null);
   const [activeTab, setActiveTab] = useState('chat');
   const [isMobile, setIsMobile] = useState(false);
+  const [searchMode, setSearchMode] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -127,11 +140,11 @@ export default function ChatPage() {
         },
         body: JSON.stringify({}),
       });
-
       if (response.ok) {
         const newConversation = await response.json();
         setConversations([newConversation, ...conversations]);
         setActiveConversation(newConversation);
+        setMessage('');
       } else {
         console.error('Failed to create conversation');
       }
@@ -142,11 +155,11 @@ export default function ChatPage() {
 
   const sendMessage = async () => {
     if (!message.trim() || !activeConversation || isLoading) return;
-
+    
     setIsLoading(true);
     const userMessage = message;
     setMessage('');
-
+    
     try {
       const response = await fetch(`/api/chat/conversations/${activeConversation.id}`, {
         method: 'POST',
@@ -155,13 +168,13 @@ export default function ChatPage() {
         },
         body: JSON.stringify({ 
           message: userMessage,
-          // Include a flag to prioritize latest news
-          prioritizeLatest: true 
+          webSearchEnabled,
+          searchMode
         }),
       });
-
+      
       if (response.ok) {
-        const { response: aiResponse } = await response.json();
+        const { response: aiResponse, sources } = await response.json();
         
         // Update the active conversation with the new messages
         const updatedConversations = conversations.map(conv => {
@@ -181,6 +194,7 @@ export default function ChatPage() {
                   role: 'assistant' as const,
                   content: aiResponse,
                   createdAt: new Date().toISOString(),
+                  sources
                 }
               ],
               updatedAt: new Date().toISOString(),
@@ -200,25 +214,26 @@ export default function ChatPage() {
       toast.error('Error sending message');
     } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
     }
   };
 
   const exploreTopic = async () => {
     if (!message.trim() || isLoading) return;
-
+    
     setIsLoading(true);
     const topic = message;
     setMessage('');
-
+    
     try {
       const response = await fetch('/api/chat/explore-topic', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ topic }),
+        body: JSON.stringify({ topic, webSearchEnabled }),
       });
-
+      
       if (response.ok) {
         const data = await response.json();
         setTopicExploration(data);
@@ -238,7 +253,14 @@ export default function ChatPage() {
   const generateBriefing = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/chat/personalized-briefing');
+      const response = await fetch('/api/chat/personalized-briefing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ webSearchEnabled }),
+      });
+      
       if (response.ok) {
         const data = await response.json();
         setBriefing(data);
@@ -266,16 +288,76 @@ export default function ChatPage() {
     }
   };
 
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  };
+
+  const regenerateResponse = async () => {
+    if (!activeConversation || activeConversation.messages.length === 0 || isLoading) return;
+    
+    // Get the last user message
+    const lastUserMessage = activeConversation.messages
+      .filter(msg => msg.role === 'user')
+      .pop();
+    
+    if (!lastUserMessage) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(`/api/chat/conversations/${activeConversation.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message: lastUserMessage.content,
+          webSearchEnabled,
+          searchMode,
+          regenerate: true
+        }),
+      });
+      
+      if (response.ok) {
+        const { response: aiResponse, sources } = await response.json();
+        
+        // Update the active conversation with the new messages
+        const updatedConversations = conversations.map(conv => {
+          if (conv.id === activeConversation.id) {
+            // Remove the last assistant message and add the new one
+            const messagesWithoutLastAssistant = conv.messages.slice(0, -1);
+            return {
+              ...conv,
+              messages: [
+                ...messagesWithoutLastAssistant,
+                {
+                  id: Date.now().toString(),
+                  role: 'assistant' as const,
+                  content: aiResponse,
+                  createdAt: new Date().toISOString(),
+                  sources
+                }
+              ],
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return conv;
+        });
+        
+        setConversations(updatedConversations);
+        setActiveConversation(updatedConversations.find(c => c.id === activeConversation.id) || null);
+      } else {
+        console.error('Failed to regenerate response');
+        toast.error('Failed to regenerate response');
+      }
+    } catch (error) {
+      console.error('Error regenerating response:', error);
+      toast.error('Error regenerating response');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const formatBriefingContent = (content: string) => {
     // Split content into sections based on double line breaks
@@ -312,17 +394,42 @@ export default function ChatPage() {
     });
   };
 
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b p-4">
+      <div className="bg-white border-b shadow-sm p-4">
         <div className="container mx-auto flex flex-col sm:flex-row sm:items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">AI Assistant</h1>
-            <p className="text-gray-600 text-sm">Chat with AI about news, explore topics, and get personalized briefings.</p>
+          <div className="flex items-center space-x-3 mb-4 sm:mb-0">
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">NewsGenie AI</h1>
+              <p className="text-gray-600 text-sm">Your intelligent news assistant</p>
+            </div>
           </div>
-          <div className="flex items-center space-x-3 mt-4 sm:mt-0">
-            <Button onClick={generateBriefing} disabled={isLoading}>
+          <div className="flex items-center space-x-3">
+            <Button 
+              variant={webSearchEnabled ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+              className="flex items-center"
+            >
+              <Globe className="h-4 w-4 mr-2" />
+              Web Search {webSearchEnabled ? "On" : "Off"}
+            </Button>
+            <Button onClick={generateBriefing} disabled={isLoading} className="flex items-center">
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
@@ -338,7 +445,7 @@ export default function ChatPage() {
       <div className="flex-1 container mx-auto px-4 py-6 flex flex-col md:flex-row gap-6 overflow-hidden">
         {/* Sidebar */}
         <div className="w-full md:w-64 flex-shrink-0">
-          <Card className="h-full flex flex-col">
+          <Card className="h-full flex flex-col shadow-sm border-0 bg-white/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">Conversations</CardTitle>
@@ -386,28 +493,33 @@ export default function ChatPage() {
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col min-h-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="chat" className="flex items-center space-x-2">
+            <TabsList className="grid w-full grid-cols-3 mb-6 bg-white p-1 rounded-lg shadow-sm">
+              <TabsTrigger value="chat" className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <MessageSquare className="h-4 w-4" />
                 <span>Chat</span>
               </TabsTrigger>
-              <TabsTrigger value="explore" className="flex items-center space-x-2">
+              <TabsTrigger value="explore" className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <Compass className="h-4 w-4" />
                 <span>Explore</span>
               </TabsTrigger>
-              <TabsTrigger value="briefing" className="flex items-center space-x-2">
+              <TabsTrigger value="briefing" className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <FileText className="h-4 w-4" />
                 <span>Briefing</span>
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
-              <Card className="flex-1 flex flex-col">
+              <Card className="flex-1 flex flex-col shadow-sm border-0 bg-white/80 backdrop-blur-sm">
                 <CardHeader className="pb-3">
-                  <CardTitle>
+                  <CardTitle className="flex items-center">
                     {activeConversation 
                       ? activeConversation.title 
                       : 'Select a conversation or start a new one'}
+                    {activeConversation && (
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {activeConversation.messages.length} messages
+                      </Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>
                     Chat with AI about news and current events
@@ -422,14 +534,48 @@ export default function ChatPage() {
                             <div className="text-center max-w-md">
                               <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                               <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
-                              <p className="text-sm">
-                                Ask a question about current events or news topics.
+                              <p className="text-sm mb-6">
+                                Ask a question about current events or news topics. I can search the web for the latest information.
                               </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  className="justify-start h-auto p-3"
+                                  onClick={() => setMessage("What are the latest developments in AI technology?")}
+                                >
+                                  <Lightbulb className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="text-left">Latest AI developments</span>
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  className="justify-start h-auto p-3"
+                                  onClick={() => setMessage("What's happening in global politics today?")}
+                                >
+                                  <Globe className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="text-left">Global politics news</span>
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  className="justify-start h-auto p-3"
+                                  onClick={() => setMessage("Show me the latest stock market news")}
+                                >
+                                  <TrendingUp className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="text-left">Stock market updates</span>
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  className="justify-start h-auto p-3"
+                                  onClick={() => setMessage("What are the top science stories this week?")}
+                                >
+                                  <BookOpen className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="text-left">Top science stories</span>
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         ) : (
-                          <div className="space-y-4">
-                            {activeConversation.messages.map((msg) => (
+                          <div className="space-y-6">
+                            {activeConversation.messages.map((msg, index) => (
                               <div
                                 key={msg.id}
                                 className={`flex ${
@@ -437,30 +583,75 @@ export default function ChatPage() {
                                 }`}
                               >
                                 <div
-                                  className={`max-w-[80%] md:max-w-[70%] rounded-lg p-3 ${
+                                  className={`max-w-[80%] md:max-w-[70%] rounded-2xl p-4 ${
                                     msg.role === 'user'
                                       ? 'bg-blue-500 text-white'
                                       : 'bg-gray-100 text-gray-800'
                                   }`}
                                 >
-                                  <div className="flex items-start space-x-2">
+                                  <div className="flex items-start space-x-3">
                                     {msg.role === 'assistant' && (
-                                      <Bot className="h-5 w-5 mt-0.5 text-blue-500 flex-shrink-0" />
+                                      <div className="bg-blue-100 p-2 rounded-full flex-shrink-0">
+                                        <Bot className="h-5 w-5 text-blue-600" />
+                                      </div>
                                     )}
-                                    <div className="min-w-0">
-                                      <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="prose prose-sm max-w-none">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                          {msg.content}
+                                        </ReactMarkdown>
+                                      </div>
+                                      
+                                      {msg.sources && msg.sources.length > 0 && (
+                                        <div className="mt-3 pt-3 border-t border-gray-200">
+                                          <p className="text-xs font-medium text-gray-500 mb-2">Sources:</p>
+                                          <div className="space-y-1">
+                                            {msg.sources.slice(0, 3).map((source, i) => (
+                                              <div key={i} className="flex items-center text-xs text-gray-600">
+                                                <ExternalLink className="h-3 w-3 mr-1 flex-shrink-0" />
+                                                <span className="truncate">{source}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
                                       <div
-                                        className={`text-xs mt-1 ${
+                                        className={`text-xs mt-2 ${
                                           msg.role === 'user'
                                             ? 'text-blue-100'
                                             : 'text-gray-500'
-                                        }`}
+                                        } flex items-center justify-between`}
                                       >
-                                        {format(new Date(msg.createdAt), 'h:mm a')}
+                                        <span>{format(new Date(msg.createdAt), 'h:mm a')}</span>
+                                        <div className="flex space-x-1">
+                                          <button 
+                                            onClick={() => copyToClipboard(msg.content)}
+                                            className="p-1 rounded hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </button>
+                                          {msg.role === 'assistant' && (
+                                            <>
+                                              <button 
+                                                className="p-1 rounded hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                                              >
+                                                <ThumbsUp className="h-3 w-3" />
+                                              </button>
+                                              <button 
+                                                className="p-1 rounded hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                                              >
+                                                <ThumbsDown className="h-3 w-3" />
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                     {msg.role === 'user' && (
-                                      <User className="h-5 w-5 mt-0.5 text-blue-200 flex-shrink-0" />
+                                      <div className="bg-blue-400 p-2 rounded-full flex-shrink-0">
+                                        <User className="h-5 w-5 text-white" />
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -470,9 +661,33 @@ export default function ChatPage() {
                           </div>
                         )}
                       </ScrollArea>
-                      <div className="border-t p-4">
+                      <div className="border-t p-4 bg-white">
+                        <div className="flex space-x-2 mb-3">
+                          <Button 
+                            variant={searchMode ? "default" : "outline"} 
+                            size="sm" 
+                            onClick={() => setSearchMode(!searchMode)}
+                            className="flex items-center"
+                          >
+                            <Search className="h-4 w-4 mr-2" />
+                            Search Mode {searchMode ? "On" : "Off"}
+                          </Button>
+                          {activeConversation.messages.length > 0 && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={regenerateResponse}
+                              disabled={isLoading}
+                              className="flex items-center"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Regenerate
+                            </Button>
+                          )}
+                        </div>
                         <div className="flex space-x-2">
                           <Input
+                            ref={inputRef}
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             onKeyDown={handleKeyPress}
@@ -490,6 +705,11 @@ export default function ChatPage() {
                               <Send className="h-4 w-4" />
                             )}
                           </Button>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-2">
+                          {webSearchEnabled 
+                            ? "Web search is enabled - I'll find the latest information from across the internet"
+                            : "Web search is disabled - I'll use my knowledge base"}
                         </div>
                       </div>
                     </>
@@ -513,7 +733,7 @@ export default function ChatPage() {
             </TabsContent>
 
             <TabsContent value="explore" className="flex-1 mt-0">
-              <Card className="h-full flex flex-col">
+              <Card className="h-full flex flex-col shadow-sm border-0 bg-white/80 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle>Explore Topics</CardTitle>
                   <CardDescription>
@@ -541,7 +761,6 @@ export default function ChatPage() {
                       )}
                     </Button>
                   </div>
-
                   {topicExploration && (
                     <div className="space-y-6 flex-1 overflow-auto">
                       <div>
@@ -552,7 +771,6 @@ export default function ChatPage() {
                           </p>
                         </div>
                       </div>
-
                       {topicExploration.relatedTopics.length > 0 && (
                         <div>
                           <h3 className="text-lg font-medium mb-2">Related Topics</h3>
@@ -565,7 +783,6 @@ export default function ChatPage() {
                           </div>
                         </div>
                       )}
-
                       {topicExploration.suggestedQuestions.length > 0 && (
                         <div>
                           <h3 className="text-lg font-medium mb-2">Suggested Questions</h3>
@@ -591,7 +808,7 @@ export default function ChatPage() {
             </TabsContent>
 
             <TabsContent value="briefing" className="flex-1 mt-0">
-              <Card className="h-full flex flex-col">
+              <Card className="h-full flex flex-col shadow-sm border-0 bg-white/80 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>Personalized Briefing</CardTitle>

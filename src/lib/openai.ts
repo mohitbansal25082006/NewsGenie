@@ -124,34 +124,40 @@ export async function extractKeywords(text: string): Promise<string[]> {
 
 /**
  * Generate a chat response given messages and optional article context.
- * articleContext: array of short strings like "1) Title — Source (date) — snippet — url"
+ * Enhanced to provide better formatted responses with citations.
  */
 export async function generateChatResponse(
   messages: ChatMessage[],
-  articleContext?: string[]
+  articleContext?: string[],
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    includeSources?: boolean;
+  }
 ): Promise<string> {
   try {
+    const temperature = options?.temperature ?? 0.25;
+    const maxTokens = options?.maxTokens ?? 1500;
+    const includeSources = options?.includeSources ?? true;
+    
     let systemMessage =
       'You are NewsGenie, an expert news assistant. Provide clear, accurate, and well-sourced answers. Avoid hallucination. When provided with news context, prefer facts from that context and cite sources inline (Source, date). If something is not supported by provided context, clearly state that.';
-
     if (articleContext && articleContext.length > 0) {
       // Keep context compact to fit tokens
       const ctx = articleContext.slice(0, 6).join('\n');
       systemMessage += `\n\nContext (use when relevant):\n${ctx}`;
     }
-
+    systemMessage += '\n\nFormat your response with clear headings, bullet points, and structured text for readability. Use markdown formatting when appropriate.';
     const payloadMessages: ChatMessage[] = [
       { role: 'system', content: systemMessage },
       ...messages.filter((m) => m.role !== 'system'),
     ];
-
     const response = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: payloadMessages,
-      max_tokens: 1100,
-      temperature: 0.25,
+      max_tokens: maxTokens,
+      temperature: temperature,
     });
-
     return response.choices?.[0]?.message?.content ?? "I'm sorry, I couldn't generate a response.";
   } catch (error: unknown) {
     if (error instanceof Error) console.error('OpenAI chat error:', error.message);
@@ -161,23 +167,147 @@ export async function generateChatResponse(
 }
 
 /**
+ * Generate a chat response with web search capabilities
+ * Enhanced to provide comprehensive answers using the latest information
+ */
+export async function generateEnhancedChatResponse(
+  messages: ChatMessage[],
+  webSearchResults?: string[],
+  newsContext?: string[],
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    includeSources?: boolean;
+    searchMode?: 'news' | 'comprehensive';
+  }
+): Promise<{ response: string; sources: string[] }> {
+  try {
+    const temperature = options?.temperature ?? 0.25;
+    const maxTokens = options?.maxTokens ?? 2000;
+    const includeSources = options?.includeSources ?? true;
+    const searchMode = options?.searchMode ?? 'news';
+    
+    let systemMessage = `You are NewsGenie, an advanced AI news assistant with access to the latest information from across the internet. 
+    Provide comprehensive, well-structured answers with proper citations. 
+    When responding:
+    1. Use clear headings and subheadings to organize your response
+    2. Use bullet points for lists and key information
+    3. Include relevant quotes or statistics when available
+    4. Always cite your sources inline with the source name and date
+    5. If information is conflicting or uncertain, acknowledge it
+    6. For time-sensitive topics, prioritize the most recent information
+    7. Use markdown formatting for better readability`;
+
+    // Add context based on available information
+    let contextSections = [];
+    
+    if (webSearchResults && webSearchResults.length > 0) {
+      contextSections.push(`WEB SEARCH RESULTS:\n${webSearchResults.join('\n')}`);
+    }
+    
+    if (newsContext && newsContext.length > 0) {
+      contextSections.push(`NEWS CONTEXT:\n${newsContext.join('\n')}`);
+    }
+    
+    if (contextSections.length > 0) {
+      systemMessage += `\n\n${contextSections.join('\n\n')}`;
+    }
+
+    systemMessage += `\n\nBased on the ${searchMode === 'comprehensive' ? 'web search results and news context' : 'news context'} above, provide a comprehensive answer to the user's question. If the context doesn't contain sufficient information, you may use your general knowledge but clearly indicate when you're doing so.`;
+
+    const payloadMessages: ChatMessage[] = [
+      { role: 'system', content: systemMessage },
+      ...messages.filter((m) => m.role !== 'system'),
+    ];
+
+    const response = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: payloadMessages,
+      max_tokens: maxTokens,
+      temperature: temperature,
+    });
+
+    const content = response.choices?.[0]?.message?.content ?? "I'm sorry, I couldn't generate a response.";
+    
+    // Extract sources from the response
+    const sources = includeSources ? extractSources(content) : [];
+    
+    return { response: content, sources };
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI enhanced chat error:', error.message);
+    else console.error('OpenAI enhanced chat unknown error:', error);
+    return { 
+      response: "I'm experiencing technical difficulties. Please try again later.", 
+      sources: [] 
+    };
+  }
+}
+
+/**
  * Compatibility wrapper intended to be used by your chat layer (e.g., generateAndSaveResponse in /lib/chat).
- * If you already have a generateAndSaveResponse implementation, call generateChatResponse directly there.
+ * Enhanced to support regeneration and source extraction.
  */
 export async function generateAndSaveResponse(
   conversationId: string,
   userMessage: string,
   userId: string,
-  articleContext?: string[]
-): Promise<{ reply: string; saved?: boolean }> {
+  options?: {
+    articleContext?: string[];
+    webSearchContext?: string[];
+    regenerate?: boolean;
+    sources?: string[];
+  }
+): Promise<{ reply: string; saved?: boolean; sources?: string[] }> {
   try {
-    const reply = await generateChatResponse([{ role: 'user', content: userMessage }], articleContext);
-    // NOTE: This wrapper does not save to DB — your '@/lib/chat' should handle DB persistence.
-    return { reply, saved: false };
+    const { articleContext, webSearchContext, regenerate, sources } = options || {};
+    
+    // If web search context is available, use enhanced response
+    if (webSearchContext && webSearchContext.length > 0) {
+      const { response, sources: extractedSources } = await generateEnhancedChatResponse(
+        [{ role: 'user', content: userMessage }],
+        webSearchContext,
+        articleContext,
+        {
+          includeSources: true,
+          maxTokens: regenerate ? 2500 : 2000,
+          temperature: regenerate ? 0.3 : 0.25
+        }
+      );
+      
+      return { 
+        reply: response, 
+        saved: false, 
+        sources: extractedSources 
+      };
+    }
+    
+    // Otherwise, use standard response
+    const reply = await generateChatResponse(
+      [{ role: 'user', content: userMessage }], 
+      articleContext,
+      {
+        includeSources: true,
+        maxTokens: regenerate ? 1800 : 1500,
+        temperature: regenerate ? 0.3 : 0.25
+      }
+    );
+    
+    // Extract sources from the reply
+    const extractedSources = extractSources(reply);
+    
+    return { 
+      reply, 
+      saved: false, 
+      sources: extractedSources 
+    };
   } catch (error: unknown) {
     if (error instanceof Error) console.error('generateAndSaveResponse error:', error.message);
     else console.error('generateAndSaveResponse unknown error:', error);
-    return { reply: "I'm experiencing technical difficulties. Please try again later.", saved: false };
+    return { 
+      reply: "I'm experiencing technical difficulties. Please try again later.", 
+      saved: false,
+      sources: []
+    };
   }
 }
 
@@ -336,37 +466,43 @@ export async function extractArticleContentFromUrl(url: string): Promise<{
 
 /**
  * Explore topic: explanation, related topics, suggested questions
+ * Enhanced to provide more comprehensive results
  */
 export async function exploreTopic(
   topic: string,
-  userPreferences?: { interests: string[]; country: string; language: string }
+  userPreferences?: { interests: string[]; country: string; language: string },
+  webSearchResults?: string[]
 ): Promise<{ explanation: string; relatedTopics: string[]; suggestedQuestions: string[] }> {
   try {
     const prefText = userPreferences
       ? `User preferences:\n- Interests: ${userPreferences.interests.join(', ')}\n- Country: ${userPreferences.country}\n- Language: ${userPreferences.language}`
       : '';
-
+      
+    const searchContext = webSearchResults && webSearchResults.length > 0
+      ? `\n\nWeb Search Results:\n${webSearchResults.join('\n')}`
+      : '';
+      
     const response = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
           content:
-            'You are an AI assistant that helps users explore news topics. Provide a concise explanation, suggest 4-6 related topics, and 6 suggested questions the user might ask to learn more. Format clearly.',
+            'You are an AI assistant that helps users explore news topics. Provide a comprehensive explanation, suggest 4-6 related topics, and 6 suggested questions the user might ask to learn more. Use the web search results if available to provide the most current information. Format your response clearly with appropriate headings.',
         },
-        { role: 'user', content: `Topic: ${topic}\n\n${prefText}` },
+        { role: 'user', content: `Topic: ${topic}\n\n${prefText}${searchContext}` },
       ],
-      max_tokens: 800,
+      max_tokens: 1200,
       temperature: 0.6,
     });
-
+    
     const text = response.choices?.[0]?.message?.content ?? '';
-
+    
     // Try to parse out sections heuristically
     const explanationMatch = text.match(/Explanation:([\s\S]*?)(?=Related Topics:|Suggested Questions:|$)/i);
     const relatedMatch = text.match(/Related Topics:([\s\S]*?)(?=Suggested Questions:|$)/i);
     const suggestedMatch = text.match(/Suggested Questions:([\s\S]*?)$/i);
-
+    
     const explanation = explanationMatch ? explanationMatch[1].trim() : text.trim();
     const relatedTopics = relatedMatch
       ? relatedMatch[1].split(/,|\n/).map((s) => s.replace(/^-?\s*/, '').trim()).filter(Boolean)
@@ -374,7 +510,7 @@ export async function exploreTopic(
     const suggestedQuestions = suggestedMatch
       ? suggestedMatch[1].split(/\n/).map((s) => s.replace(/^-?\s*/, '').trim()).filter(Boolean)
       : [];
-
+      
     return { explanation, relatedTopics, suggestedQuestions };
   } catch (error: unknown) {
     if (error instanceof Error) console.error('OpenAI exploreTopic error:', error.message);
@@ -389,29 +525,37 @@ export async function exploreTopic(
 
 /**
  * Generate a personalized briefing based on recent articles (title + summary).
+ * Enhanced to provide more comprehensive and personalized briefings
  */
 export async function generatePersonalizedBriefing(
   userPreferences: { interests: string[]; country: string; language: string },
-  recentArticles: { title: string; summary: string; category: string; publishedAt: string }[]
+  recentArticles: { title: string; summary: string; category: string; publishedAt: string }[],
+  webSearchResults?: string[]
 ): Promise<string> {
   try {
     const prefText = `Interests: ${userPreferences.interests.join(', ')}\nCountry: ${userPreferences.country}\nLanguage: ${userPreferences.language}`;
+    
     const articlesText = recentArticles
       .slice(0, 12)
       .map((a) => `- ${a.title} (${a.category}, ${a.publishedAt}): ${a.summary}`)
       .join('\n');
-
-    const system = 'You are NewsGenie. Create a concise personalized briefing organized by topic. Highlight the most important items. Keep it under ~500 words.';
+      
+    const searchContext = webSearchResults && webSearchResults.length > 0
+      ? `\n\nAdditional Web Search Results:\n${webSearchResults.join('\n')}`
+      : '';
+      
+    const system = 'You are NewsGenie. Create a comprehensive personalized briefing organized by topic. Highlight the most important items and provide context. Use markdown formatting for readability. Include a brief summary at the beginning and organize content by themes. Keep it under ~800 words.';
+    
     const response = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: [
         { role: 'system', content: system },
-        { role: 'user', content: `User preferences:\n${prefText}\n\nRecent articles:\n${articlesText}` },
+        { role: 'user', content: `User preferences:\n${prefText}\n\nRecent articles:\n${articlesText}${searchContext}` },
       ],
-      max_tokens: 700,
+      max_tokens: 1000,
       temperature: 0.35,
     });
-
+    
     return response.choices?.[0]?.message?.content ?? "I couldn't generate a briefing at this time.";
   } catch (error: unknown) {
     if (error instanceof Error) console.error('OpenAI briefing error:', error.message);
@@ -440,7 +584,7 @@ export async function detailedSentimentAnalysis(text: string): Promise<{
       max_tokens: 160,
       temperature: 0.2,
     });
-
+    
     const content = response.choices?.[0]?.message?.content ?? '';
     // Try strict JSON parse, otherwise try to extract JSON substring
     try {
@@ -477,12 +621,107 @@ export async function generateArticleTags(title: string, content: string): Promi
       max_tokens: 80,
       temperature: 0.25,
     });
-
+    
     const out = response.choices?.[0]?.message?.content ?? '';
     return out.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 10);
   } catch (error: unknown) {
     if (error instanceof Error) console.error('OpenAI tag generation error:', error.message);
     else console.error('OpenAI tag generation unknown error:', error);
     return [];
+  }
+}
+
+/**
+ * Extract sources from text content
+ */
+function extractSources(text: string): string[] {
+  const sources: string[] = [];
+  
+  // Extract URLs
+  const urlRegex = /https?:\/\/[^\s)]+/g;
+  const urls = text.match(urlRegex) || [];
+  urls.forEach(url => {
+    if (!sources.includes(url)) sources.push(url);
+  });
+  
+  // Extract source names in parentheses
+  const sourceRegex = /\(([A-Za-z0-9\s&.-]+,\s*\d{1,2}\/\d{1,2}\/\d{2,4})\)/g;
+  const sourceMatches = text.match(sourceRegex) || [];
+  sourceMatches.forEach(match => {
+    const cleanMatch = match.replace(/[()]/g, '');
+    if (!sources.includes(cleanMatch)) sources.push(cleanMatch);
+  });
+  
+  return sources.slice(0, 10); // Limit to 10 sources
+}
+
+/**
+ * Generate a comprehensive news analysis
+ */
+export async function generateNewsAnalysis(
+  topic: string,
+  newsArticles: { title: string; content: string; source: string; publishedAt: string }[],
+  webSearchResults?: string[]
+): Promise<{
+  summary: string;
+  keyPoints: string[];
+  timeline: { date: string; event: string }[];
+  sources: string[];
+}> {
+  try {
+    const articlesText = newsArticles
+      .map((a, i) => `Article ${i+1}:\nTitle: ${a.title}\nSource: ${a.source}\nDate: ${a.publishedAt}\nContent: ${a.content.substring(0, 500)}...`)
+      .join('\n\n');
+      
+    const searchContext = webSearchResults && webSearchResults.length > 0
+      ? `\n\nWeb Search Results:\n${webSearchResults.join('\n')}`
+      : '';
+      
+    const system = `You are an expert news analyst. Analyze the provided news articles and web search results about "${topic}".
+    Provide:
+    1. A comprehensive summary of the situation
+    2. Key points and developments
+    3. A timeline of events in chronological order
+    Format your response as a JSON object with the following structure:
+    {
+      "summary": "Comprehensive summary",
+      "keyPoints": ["Point 1", "Point 2", ...],
+      "timeline": [{"date": "YYYY-MM-DD", "event": "Event description"}, ...],
+      "sources": ["Source 1", "Source 2", ...]
+    }`;
+    
+    const response = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: `Topic: ${topic}\n\n${articlesText}${searchContext}` },
+      ],
+      max_tokens: 1500,
+      temperature: 0.3,
+    });
+    
+    const content = response.choices?.[0]?.message?.content ?? '';
+    
+    // Try to parse JSON response
+    try {
+      return JSON.parse(content);
+    } catch (e) {
+      // Fallback if JSON parsing fails
+      return {
+        summary: content,
+        keyPoints: [],
+        timeline: [],
+        sources: extractSources(content)
+      };
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI news analysis error:', error.message);
+    else console.error('OpenAI news analysis unknown error:', error);
+    return {
+      summary: "I'm experiencing technical difficulties. Please try again later.",
+      keyPoints: [],
+      timeline: [],
+      sources: []
+    };
   }
 }

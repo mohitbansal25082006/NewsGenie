@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getConversation, generateAndSaveResponse } from '@/lib/chat';
 import { NewsAPI } from '@/lib/newsApi';
+import { searchWeb, formatWebSearchResults } from '@/lib/webSearch';
 
 /** Types for NewsAPI responses to avoid `any` */
 interface NewsApiSource {
@@ -49,11 +50,7 @@ export async function GET(
 
     return NextResponse.json(conversation);
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error getting conversation:', error.message);
-    } else {
-      console.error('Error getting conversation (unknown):', error);
-    }
+    console.error('Error getting conversation:', error);
     return NextResponse.json({ error: 'Failed to get conversation' }, { status: 500 });
   }
 }
@@ -70,116 +67,172 @@ export async function POST(
 
     const resolvedParams = await params;
 
-    // Parse request body safely without `any`
+    // Parse request body safely
     let body: Record<string, unknown> = {};
     try {
       const parsed = await request.json().catch(() => null);
       if (parsed && typeof parsed === 'object') {
         body = parsed as Record<string, unknown>;
-      } else {
-        body = {};
       }
     } catch {
       body = {};
     }
 
-    const rawMessage = ('message' in body ? body['message'] : undefined) as unknown;
-    const message = rawMessage == null ? '' : String(rawMessage);
+    const message = String(body['message'] ?? '').trim();
+    const webSearchEnabled = Boolean(body['webSearchEnabled']);
+    const searchMode = Boolean(body['searchMode']);
+    const regenerate = Boolean(body['regenerate']);
 
-    const prioritizeLatestRaw = ('prioritizeLatest' in body ? body['prioritizeLatest'] : undefined) as unknown;
-    const prioritizeLatest = Boolean(prioritizeLatestRaw);
-
-    if (!message || message.trim().length === 0) {
+    if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    // Compose latest news context to augment user message
+    // Extract the actual user query
+    const cleanUserQuery = extractUserQuery(message);
+    console.log('Clean user query:', cleanUserQuery);
+
     let latestNewsContext = '';
+    let webSearchResults = '';
+    let allSources: string[] = [];
+
     try {
-      const newsApi = new NewsAPI();
+      const queryTerms = extractSearchTerms(cleanUserQuery);
 
-      // Extract search terms from the user message
-      const queryTerms = extractSearchTerms(message);
-
-      // If there are query terms, search specifically for them first
-      if (queryTerms.length > 0) {
+      // Web search
+      if (webSearchEnabled) {
         try {
-          const searchResponse = (await newsApi.getEverything({
-            q: queryTerms.map((t) => `"${t}"`).join(' OR '),
-            language: 'en',
-            sortBy: 'publishedAt',
-            pageSize: 8,
-          })) as NewsApiResponse | null;
+          console.log('Performing web search for:', cleanUserQuery);
+          const searchResults = await searchWeb(cleanUserQuery, {
+            type: searchMode ? 'comprehensive' : 'news',
+            numResults: 8,
+          });
 
-          if (searchResponse?.status === 'ok' && Array.isArray(searchResponse.articles) && searchResponse.articles.length > 0) {
-            latestNewsContext = buildNewsContext(searchResponse.articles, {
-              header: 'Latest News Related to Your Query',
-              maxItems: 6,
-            });
+          if (searchResults?.length) {
+            console.log('Web search returned', searchResults.length, 'results');
+            const formattedResults = formatWebSearchResults(searchResults);
+            webSearchResults = `WEB SEARCH RESULTS:\n${formattedResults.join('\n\n')}`;
+            allSources = searchResults.map((r) => r.link).filter(Boolean) as string[];
           }
         } catch (err) {
-          console.warn('newsApi.getEverything failed for queryTerms, falling back to headlines', err);
+          console.error('Web search failed:', err);
         }
       }
 
-      // If still empty or the user explicitly wants latest, get top headlines as fallback
-      if (!latestNewsContext || prioritizeLatest) {
-        try {
-          // `session.user` may have extra custom fields; cast safely to narrow shape to access `country`
-          const userExtra = (session.user as unknown) as { country?: string };
-          const country = userExtra?.country ?? 'us';
+      // Fallback to NewsAPI
+      if (!webSearchResults) {
+        const newsApi = new NewsAPI();
 
-          const headlinesResponse = (await newsApi.getTopHeadlines({
-            country,
-            pageSize: 10,
-          })) as NewsApiResponse | null;
+        if (queryTerms.length > 0) {
+          try {
+            const searchResponse = (await newsApi.getEverything({
+              q: queryTerms.map((t) => `"${t}"`).join(' OR '),
+              language: 'en',
+              sortBy: 'publishedAt',
+              pageSize: 8,
+            })) as NewsApiResponse | null;
 
-          if (headlinesResponse?.status === 'ok' && Array.isArray(headlinesResponse.articles)) {
-            const headlinesContext = buildNewsContext(headlinesResponse.articles, {
-              header: 'Latest News Headlines',
-              maxItems: 8,
-            });
+            if (searchResponse?.status === 'ok' && searchResponse.articles?.length) {
+              latestNewsContext = buildNewsContext(searchResponse.articles, {
+                header: 'Latest News Related to Your Query',
+                maxItems: 6,
+              });
 
-            // If we already had domain-specific results, append headlines as backup
-            latestNewsContext = latestNewsContext ? `${latestNewsContext}\n\n${headlinesContext}` : headlinesContext;
+              const newsSources = searchResponse.articles
+                .map((a) => a.url)
+                .filter((u): u is string => !!u);
+              allSources.push(...newsSources);
+            }
+          } catch (err) {
+            console.warn('newsApi.getEverything failed, falling back to headlines', err);
           }
-        } catch (err) {
-          console.warn('newsApi.getTopHeadlines failed:', err);
+        }
+
+        if (!latestNewsContext || searchMode) {
+          try {
+            const userExtra = session.user as { country?: string };
+            const country = userExtra?.country ?? 'us';
+
+            const headlinesResponse = (await newsApi.getTopHeadlines({
+              country,
+              pageSize: 10,
+            })) as NewsApiResponse | null;
+
+            if (headlinesResponse?.status === 'ok' && headlinesResponse.articles?.length) {
+              const headlinesContext = buildNewsContext(headlinesResponse.articles, {
+                header: 'Latest News Headlines',
+                maxItems: 8,
+              });
+
+              latestNewsContext = latestNewsContext
+                ? `${latestNewsContext}\n\n${headlinesContext}`
+                : headlinesContext;
+
+              const headlineSources = headlinesResponse.articles
+                .map((a) => a.url)
+                .filter((u): u is string => !!u);
+              allSources.push(...headlineSources);
+            }
+          } catch (err) {
+            console.warn('newsApi.getTopHeadlines failed:', err);
+          }
         }
       }
     } catch (err) {
-      console.error('Error building latestNewsContext:', err);
+      console.error('Error building context:', err);
     }
 
-    // If we have context, append a short instruction that the AI should prefer cited, recent facts
-    const newsInstruction = latestNewsContext
-      ? `\n\n[NEWS_CONTEXT_BEGIN]\n${latestNewsContext}\n[NEWS_CONTEXT_END]\n\nUse the news context above when it is relevant. Prefer facts from recent, reliable sources and cite them inline (source name and date). If something is not supported by the context, say so and avoid guessing.`
+    const combinedContext = webSearchResults
+      ? latestNewsContext
+        ? `${webSearchResults}\n\n${latestNewsContext}`
+        : webSearchResults
+      : latestNewsContext;
+
+    const contextInstruction = combinedContext
+      ? `\n\n[CONTEXT_BEGIN]\n${combinedContext}\n[CONTEXT_END]\n\nUse the context above when relevant. Prefer recent, reliable sources and cite them inline.`
       : '';
 
-    // Combine original message with the context so the AI can use it
-    const messageForAi = message + newsInstruction;
+    const messageForAi = cleanUserQuery + contextInstruction;
+    const uniqueSources = [...new Set(allSources)];
 
-    // Ask chat layer to generate and save response
-    const result = await generateAndSaveResponse(resolvedParams.id, messageForAi, session.user.id);
+    // ✅ Pass sources directly as string[]
+    const result = await generateAndSaveResponse(
+      resolvedParams.id,
+      messageForAi,
+      session.user.id,
+      uniqueSources
+    );
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error generating response:', error.message);
-    } else {
-      console.error('Error generating response (unknown):', error);
-    }
+    console.error('Error generating response:', error);
     return NextResponse.json({ error: 'Failed to generate response' }, { status: 500 });
   }
 }
 
-/* -------------- Helpers -------------- */
+/* ---------------- Helpers ---------------- */
+function extractUserQuery(message: string): string {
+  const contextBeginIndex = message.indexOf('[CONTEXT_BEGIN]');
+  if (contextBeginIndex !== -1) {
+    return message.substring(0, contextBeginIndex).trim();
+  }
+  const lines = message.split('\n');
+  const queryLines: string[] = [];
+  for (const line of lines) {
+    if (
+      line.includes('[CONTEXT_BEGIN]') ||
+      line.includes('WEB SEARCH RESULTS:') ||
+      line.includes('Latest News Related to Your Query:') ||
+      line.includes('Latest News Headlines:') ||
+      line.includes('Source:') ||
+      line.match(/^\d+\./)
+    ) {
+      break;
+    }
+    queryLines.push(line);
+  }
+  return queryLines.join('\n').trim();
+}
 
-/**
- * Build a compact news context with title, source, publishedAt (relative) and a short snippet.
- * Accepts NewsApiArticle[] directly (handles nulls/undefined safely).
- * Returns a string ready to be appended to the AI prompt.
- */
 function buildNewsContext(
   articles: NewsApiArticle[],
   opts: { header: string; maxItems?: number }
@@ -192,43 +245,50 @@ function buildNewsContext(
     const snippetShort = snippet.length > 140 ? snippet.slice(0, 137) + '...' : snippet;
     const safeTitle = (a.title ?? 'No title').replace(/\s+/g, ' ').trim();
     const urlPart = a.url ? ` — ${a.url}` : '';
-    return `${i + 1}. ${safeTitle} — ${source} (${published})${snippetShort ? ` — ${snippetShort}` : ''}${urlPart}`;
+    return `${i + 1}. ${safeTitle} — ${source} (${published})${
+      snippetShort ? ` — ${snippetShort}` : ''
+    }${urlPart}`;
   });
-
   return `${opts.header}:\n${items.join('\n')}`;
 }
 
-/**
- * Extract search terms from the message:
- * - Named entities (capitalized sequences)
- * - Known news keywords present in text
- * - Words longer than 3 chars if no other term found (as last resort)
- */
 function extractSearchTerms(message: string): string[] {
-  if (!message || typeof message !== 'string') return [];
+  if (!message) return [];
   const terms = new Set<string>();
   const lower = message.toLowerCase();
-
-  // Known news keywords to look for
   const newsKeywords = [
-    'modi', 'narendra modi', 'biden', 'joe biden', 'trump', 'ukraine', 'russia',
-    'china', 'ai', 'artificial intelligence', 'election', 'economy', 'stocks',
-    'covid', 'climate', 'technology', 'market', 'india', 'pakistan', 'uk', 'us', 'usa'
+    'modi',
+    'narendra modi',
+    'biden',
+    'joe biden',
+    'trump',
+    'ukraine',
+    'russia',
+    'china',
+    'ai',
+    'artificial intelligence',
+    'election',
+    'economy',
+    'stocks',
+    'covid',
+    'climate',
+    'technology',
+    'market',
+    'india',
+    'pakistan',
+    'uk',
+    'us',
+    'usa',
   ];
-
   for (const kw of newsKeywords) {
     if (lower.includes(kw)) terms.add(kw);
   }
-
-  // Find multi-word capitalized sequences (e.g., "United States", "Elon Musk")
   const capSeqRegex = /\b([A-Z][a-z]{1,}\b(?:\s+[A-Z][a-z]{1,}\b){0,3})/g;
   let match: RegExpExecArray | null;
   while ((match = capSeqRegex.exec(message)) !== null) {
     const t = match[1].trim();
     if (t.length > 2) terms.add(t);
   }
-
-  // If still empty, take longest words (as fallback)
   if (terms.size === 0) {
     const words = message
       .replace(/[^\w\s]/g, ' ')
@@ -236,11 +296,9 @@ function extractSearchTerms(message: string): string[] {
       .filter((w) => w.length > 3);
     words.slice(0, 4).forEach((w) => terms.add(w));
   }
-
   return Array.from(terms).slice(0, 6);
 }
 
-/** Get human-friendly relative date or short date */
 function formatDate(dateString: string): string {
   try {
     const d = new Date(dateString);
@@ -255,7 +313,6 @@ function formatDate(dateString: string): string {
   }
 }
 
-/** Very small sanitizer to produce readable snippet text from HTML-ish content */
 function sanitizeSnippet(input?: string): string {
   if (!input) return '';
   return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
