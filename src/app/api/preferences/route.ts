@@ -1,3 +1,4 @@
+// E:\newsgenie\src\app\api\preferences\route.ts
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -9,16 +10,16 @@ export async function GET() {
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
+    
     const user = await db.user.findUnique({
       where: { email: session.user.email },
       include: { userPreference: true },
     });
-
+    
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
+    
     if (!user.userPreference) {
       const defaultPreferences = await db.userPreference.create({
         data: {
@@ -29,11 +30,15 @@ export async function GET() {
           language: 'en',
           emailNotifications: false,
           articlesPerDay: 20,
+          notifyBreakingNews: true,
+          notifyNewArticles: true,
+          notifyDigest: false,
+          digestTime: '08:00',
         },
       });
       return NextResponse.json(defaultPreferences);
     }
-
+    
     return NextResponse.json(user.userPreference);
   } catch (error) {
     console.error('Get preferences error:', error);
@@ -50,17 +55,16 @@ export async function POST(request: Request) {
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
+    
     const data = await request.json();
-
     const user = await db.user.findUnique({
       where: { email: session.user.email },
     });
-
+    
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
+    
     const preferences = await db.userPreference.upsert({
       where: { userId: user.id },
       update: {
@@ -70,6 +74,10 @@ export async function POST(request: Request) {
         language: data.language || 'en',
         emailNotifications: data.emailNotifications ?? false,
         articlesPerDay: data.articlesPerDay ?? 20,
+        notifyBreakingNews: data.notifyBreakingNews ?? true,
+        notifyNewArticles: data.notifyNewArticles ?? true,
+        notifyDigest: data.notifyDigest ?? false,
+        digestTime: data.digestTime || '08:00',
       },
       create: {
         userId: user.id,
@@ -79,9 +87,13 @@ export async function POST(request: Request) {
         language: data.language || 'en',
         emailNotifications: data.emailNotifications ?? false,
         articlesPerDay: data.articlesPerDay ?? 20,
+        notifyBreakingNews: data.notifyBreakingNews ?? true,
+        notifyNewArticles: data.notifyNewArticles ?? true,
+        notifyDigest: data.notifyDigest ?? false,
+        digestTime: data.digestTime || '08:00',
       },
     });
-
+    
     return NextResponse.json(preferences);
   } catch (error) {
     console.error('Update preferences error:', error);

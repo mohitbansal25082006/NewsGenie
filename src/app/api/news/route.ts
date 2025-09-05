@@ -1,9 +1,11 @@
+// E:\newsgenie\src\app\api\news\route.ts
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { NewsAPI } from '@/lib/newsApi';
 import { summarizeArticle, analyzeSentiment, extractKeywords } from '@/lib/openai';
+import { createNotification, sendBreakingNewsNotification, sendNewArticleNotification } from '@/lib/notifications';
 
 const newsApi = new NewsAPI();
 
@@ -78,7 +80,7 @@ export async function GET(request: Request) {
           const summary = article.content ? await summarizeArticle(article.content) : null;
           const sentiment = article.title ? await analyzeSentiment(article.title + ' ' + (article.description || '')) : 'neutral';
           const keywords = article.title ? await extractKeywords(article.title + ' ' + (article.description || '')) : [];
-
+          
           dbArticle = await db.article.create({
             data: {
               title: article.title,
@@ -97,6 +99,42 @@ export async function GET(request: Request) {
               keywords,
             },
           });
+
+          // Check if this is breaking news (published within the last hour)
+          const publishedTime = new Date(article.publishedAt);
+          const oneHourAgo = new Date();
+          oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+          const isBreakingNews = publishedTime > oneHourAgo;
+
+          // Send notifications to users who have enabled them
+          if (isBreakingNews) {
+            // Send breaking news notifications to relevant users
+            await sendBreakingNewsNotification(dbArticle);
+          } else {
+            // Send new article notifications to relevant users
+            await sendNewArticleNotification(dbArticle);
+          }
+
+          // Also send a notification to the current user if they have notifications enabled
+          if (user?.userPreference) {
+            if (isBreakingNews && user.userPreference.notifyBreakingNews) {
+              await createNotification({
+                userId: user.id,
+                title: "Breaking News",
+                message: article.title,
+                type: "breaking_news",
+                articleId: dbArticle.id,
+              });
+            } else if (user.userPreference.notifyNewArticles) {
+              await createNotification({
+                userId: user.id,
+                title: "New Article",
+                message: article.title,
+                type: "new_article",
+                articleId: dbArticle.id,
+              });
+            }
+          }
         }
 
         return {
@@ -113,7 +151,6 @@ export async function GET(request: Request) {
       ...newsResponse,
       articles: processedArticles,
     });
-
   } catch (error) {
     console.error('News API error:', error);
     return NextResponse.json(

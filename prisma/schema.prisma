@@ -1,13 +1,12 @@
+// E:\newsgenie\prisma\schema.prisma
 // ================== GENERATORS & DATASOURCE ==================
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 // ================== USER & AUTH ==================
 model User {
   id             String          @id @default(cuid())
@@ -17,7 +16,6 @@ model User {
   image          String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-
   // Relations
   accounts       Account[]
   sessions       Session[]
@@ -25,10 +23,9 @@ model User {
   bookmarks      Bookmark[]
   readArticles   ReadArticle[]
   readingHistory ReadingHistory[]
-
+  notifications  Notification[]
   @@map("users")
 }
-
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -42,54 +39,47 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@unique([provider, providerAccountId])
   @@map("accounts")
 }
-
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@map("sessions")
 }
-
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-
   @@unique([identifier, token])
   @@map("verificationtokens")
 }
-
 // ================== USER PREFERENCES ==================
 model UserPreference {
   id        String   @id @default(cuid())
   userId    String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   // Preferences
   interests String[]
   sources   String[]
   language  String   @default("en")
   country   String   @default("us")
-
   // Settings
   emailNotifications Boolean @default(false)
   articlesPerDay     Int     @default(20)
-
+  // Notification Settings
+  notifyBreakingNews    Boolean @default(true)
+  notifyNewArticles     Boolean @default(true)
+  notifyDigest          Boolean @default(false)
+  digestTime            String?  @default("08:00")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   @@map("user_preferences")
 }
-
 // ================== ARTICLES ==================
 model Article {
   id          String   @id @default(cuid())
@@ -104,22 +94,18 @@ model Article {
   category    String   @default("general")
   country     String   @default("us")
   language    String   @default("en")
-
   // AI-generated fields
   summary     String?
   sentiment   String?
   keywords    String[]
-
   // Relations
   bookmarks    Bookmark[]
   readArticles ReadArticle[]
-
+  notifications Notification[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   @@map("articles")
 }
-
 model Bookmark {
   id        String   @id @default(cuid())
   userId    String
@@ -127,11 +113,9 @@ model Bookmark {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
-
   @@unique([userId, articleId])
   @@map("bookmarks")
 }
-
 model ReadArticle {
   id        String   @id @default(cuid())
   userId    String
@@ -139,11 +123,9 @@ model ReadArticle {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   readAt    DateTime @default(now())
-
   @@unique([userId, articleId])
   @@map("read_articles")
 }
-
 // ================== READING HISTORY & PROCESSED ARTICLES ==================
 model ReadingHistory {
   id          String   @id @default(cuid())
@@ -154,12 +136,9 @@ model ReadingHistory {
   sentiment   String?
   timeSpent   Int?
   createdAt   DateTime @default(now())
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@map("reading_history")
 }
-
 model ProcessedArticle {
   id          String   @id @default(cuid())
   articleId   String   @unique
@@ -169,6 +148,20 @@ model ProcessedArticle {
   keywords    String[]
   category    String
   processedAt DateTime @default(now())
-
   @@map("processed_articles")
+}
+// ================== NOTIFICATIONS ==================
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  type        String   // 'breaking_news', 'new_article', 'digest', 'system'
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  // Optional: link to related article
+  articleId   String?
+  article     Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  @@map("notifications")
 }

@@ -1,11 +1,12 @@
+// E:\newsgenie\src\app\layout.tsx
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Providers } from "@/components/providers"
 import Link from "next/link"
-
+import { NotificationBadge } from "@/components/ui/notification-badge"
+import { UserMenu } from "@/components/ui/user-menu"
 const inter = Inter({ subsets: ["latin"] })
-
 export const metadata: Metadata = {
   title: "NewsGenie - AI-Powered News Aggregator",
   description:
@@ -18,7 +19,6 @@ export const metadata: Metadata = {
     type: "website",
   },
 }
-
 export default function RootLayout({
   children,
 }: {
@@ -35,7 +35,6 @@ export default function RootLayout({
               <Link href="/" className="text-xl font-bold text-blue-600">
                 NewsGenie
               </Link>
-
               {/* Nav Links */}
               <div className="flex gap-6">
                 <Link
@@ -63,9 +62,13 @@ export default function RootLayout({
                   About
                 </Link>
               </div>
+              {/* Right side: Notifications and User Menu */}
+              <div className="flex items-center space-x-2">
+                <NotificationBadge />
+                <UserMenu />
+              </div>
             </nav>
           </header>
-
           {/* Page Content */}
           <main className="container mx-auto p-6">{children}</main>
         </Providers>
