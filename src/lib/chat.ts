@@ -26,7 +26,7 @@ export interface Conversation {
 /**
  * Create a new conversation for a user
  */
-export async function createConversation(userId: string, title?: string) {
+export async function createConversation(userId: string, title?: string): Promise<Conversation> {
   try {
     const conversation = await prisma.conversation.create({
       data: {
@@ -42,7 +42,8 @@ export async function createConversation(userId: string, title?: string) {
       },
     });
 
-    return conversation;
+    // cast Prisma result to local Conversation interface
+    return conversation as unknown as Conversation;
   } catch (error) {
     console.error('Error creating conversation:', error);
     throw error;
@@ -52,7 +53,7 @@ export async function createConversation(userId: string, title?: string) {
 /**
  * Get recent conversations for a user (preview)
  */
-export async function getUserConversations(userId: string) {
+export async function getUserConversations(userId: string): Promise<Conversation[]> {
   try {
     const conversations = await prisma.conversation.findMany({
       where: {
@@ -71,7 +72,7 @@ export async function getUserConversations(userId: string) {
       },
     });
 
-    return conversations;
+    return conversations as unknown as Conversation[];
   } catch (error) {
     console.error('Error getting conversations:', error);
     throw error;
@@ -81,7 +82,10 @@ export async function getUserConversations(userId: string) {
 /**
  * Get one full conversation with messages
  */
-export async function getConversation(conversationId: string, userId: string) {
+export async function getConversation(
+  conversationId: string,
+  userId: string
+): Promise<Conversation | null> {
   try {
     const conversation = await prisma.conversation.findFirst({
       where: {
@@ -97,7 +101,7 @@ export async function getConversation(conversationId: string, userId: string) {
       },
     });
 
-    return conversation;
+    return (conversation as unknown as Conversation) ?? null;
   } catch (error) {
     console.error('Error getting conversation:', error);
     throw error;
@@ -112,7 +116,7 @@ export async function addMessage(
   role: 'user' | 'assistant',
   content: string,
   articleIds: string[] = []
-) {
+): Promise<ChatMessage> {
   try {
     const message = await prisma.message.create({
       data: {
@@ -132,7 +136,7 @@ export async function addMessage(
       },
     });
 
-    return message;
+    return message as unknown as ChatMessage;
   } catch (error) {
     console.error('Error adding message:', error);
     throw error;
@@ -148,7 +152,7 @@ export async function generateAndSaveResponse(
   userMessage: string,
   userId: string,
   articleIds: string[] = []
-) {
+): Promise<{ response: string; messageId: string }> {
   try {
     // Get conversation history
     const conversation = await getConversation(conversationId, userId);
@@ -168,7 +172,8 @@ export async function generateAndSaveResponse(
     // Map existing conversation messages to OpenAI-friendly shape
     const chatMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] =
       conversation.messages.map((msg) => ({
-        role: normalizeRole((msg as any).role),
+        // msg.role may be a string at runtime; normalizeRole will handle it
+        role: normalizeRole((msg as unknown as { role?: string }).role),
         content: msg.content ?? '',
       }));
 
@@ -219,7 +224,10 @@ export async function generateAndSaveResponse(
 /**
  * Ask a question about a single article
  */
-export async function answerArticleQuestion(articleId: string, question: string) {
+export async function answerArticleQuestion(
+  articleId: string,
+  question: string
+): Promise<{ answer: string; articleTitle: string }> {
   try {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
@@ -244,8 +252,11 @@ export async function answerArticleQuestion(articleId: string, question: string)
 
 /**
  * Explore a topic, using optional user preferences
+ *
+ * Note: `exploreTopic` comes from your openai helpers and may return a complex object.
+ * Use `unknown` here to avoid implicit `any` while still passing the value through.
  */
-export async function exploreNewsTopic(userId: string, topic: string) {
+export async function exploreNewsTopic(userId: string, topic: string): Promise<unknown> {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -260,7 +271,7 @@ export async function exploreNewsTopic(userId: string, topic: string) {
         }
       : undefined;
 
-    const exploration = await exploreTopic(topic, preferences);
+    const exploration: unknown = await exploreTopic(topic, preferences);
 
     return exploration;
   } catch (error) {
@@ -272,7 +283,10 @@ export async function exploreNewsTopic(userId: string, topic: string) {
 /**
  * Create a personalized briefing for a user based on preferences and recent articles
  */
-export async function createPersonalizedBriefing(userId: string) {
+export async function createPersonalizedBriefing(userId: string): Promise<{
+  briefing: string;
+  articlesCount: number;
+}> {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -283,9 +297,10 @@ export async function createPersonalizedBriefing(userId: string) {
       throw new Error('User preferences not found');
     }
 
-    const interests = user.userPreference.interests && user.userPreference.interests.length > 0
-      ? user.userPreference.interests
-      : ['general', 'business', 'technology'];
+    const interests =
+      user.userPreference.interests && user.userPreference.interests.length > 0
+        ? user.userPreference.interests
+        : ['general', 'business', 'technology'];
 
     const recentArticles = await prisma.article.findMany({
       where: {

@@ -25,15 +25,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse body safely
-    let body: any = {};
-    try {
-      body = await request.json();
-    } catch {
+    const parsedBody = await request.json().catch(() => null);
+    if (!parsedBody || typeof parsedBody !== 'object') {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
+    const body = parsedBody as Record<string, unknown>;
 
-    const articleId = body.articleId as string | undefined;
-    const url = body.url as string | undefined;
+    const articleId = (body.articleId as string) ?? undefined;
+    const url = (body.url as string) ?? undefined;
     const deepAnalysis = Boolean(body.deepAnalysis);
 
     if (!articleId || !url) {
@@ -63,9 +62,8 @@ export async function POST(request: NextRequest) {
     // Base analysis object
     let analysisData: {
       summary: string;
-      sentiment: SentimentOverall; // keep simple string for compatibility
+      sentiment: SentimentOverall;
       keywords: string[];
-      // deepAnalysis pieces optionally added below
       sentimentDetails?: SentimentDetails;
       bias?: BiasResult;
       keyPoints?: KeyPointsResult;
@@ -77,12 +75,19 @@ export async function POST(request: NextRequest) {
       sentiment: (['positive', 'negative', 'neutral'].includes((sentimentString || '').toLowerCase())
         ? (sentimentString.toLowerCase() as SentimentOverall)
         : 'neutral'),
-      keywords: Array.isArray(keywords) ? keywords : (keywords ? [String(keywords)] : []),
+      keywords: Array.isArray(keywords) ? keywords.map(String) : (keywords ? [String(keywords)] : []),
     };
 
     // Extended deep analysis
     if (deepAnalysis) {
-      const [biasAnalysis, keyPoints, entities, factCheck, timeline, sentimentDetails] = await Promise.all([
+      const [
+        biasAnalysis,
+        keyPoints,
+        entities,
+        factCheck,
+        timeline,
+        sentimentDetails,
+      ] = await Promise.all([
         detectBias(content || article.description || title),
         extractKeyPoints(content || article.description || title),
         extractEntities(content || article.description || title),
@@ -110,13 +115,12 @@ export async function POST(request: NextRequest) {
       where: { id: articleId },
       data: {
         summary: analysisData.summary,
-        sentiment: analysisData.sentiment, // store the returned sentiment string directly
+        sentiment: analysisData.sentiment,
         keywords: analysisData.keywords,
       },
     });
 
     // Return analysis data plus some article fields
-    // NOTE: we keep `sentiment` string AND include `sentimentDetails` for the UI "Sentiment" tab.
     return NextResponse.json({
       ...analysisData,
       title: updatedArticle.title,
@@ -139,7 +143,11 @@ export async function POST(request: NextRequest) {
    They parse the returned JSON safely.
    -------------------------- */
 
-async function callOpenAIChat(payload: any): Promise<any> {
+/**
+ * Call OpenAI's chat endpoint with a typed payload.
+ * Payload is a general object (Record<string, unknown>).
+ */
+async function callOpenAIChat(payload: Record<string, unknown>): Promise<unknown> {
   const url = process.env.OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions';
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not set');
@@ -158,27 +166,67 @@ async function callOpenAIChat(payload: any): Promise<any> {
     throw new Error(`OpenAI request failed: ${resp.status} ${text}`);
   }
 
-  const data = await resp.json().catch(() => ({}));
+  const data = await resp.json().catch(() => null);
   return data;
 }
 
-async function safeParseChoiceJson(data: any): Promise<any> {
-  // Handles various shapes returned by OpenAI
+/**
+ * Safely parse common OpenAI choice shapes into either a parsed object or raw string.
+ * Returns parsed JSON, string, or null.
+ */
+async function safeParseChoiceJson(data: unknown): Promise<unknown> {
   try {
-    const raw =
-      data?.choices?.[0]?.message?.content ??
-      data?.choices?.[0]?.text ??
-      data?.choices?.[0]?.delta?.content;
-    if (!raw) return null;
-    if (typeof raw === 'object') return raw; // already parsed
-    if (typeof raw === 'string') {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return raw;
+    if (!data || typeof data !== 'object') return null;
+    const d = data as Record<string, unknown>;
+
+    const choices = d['choices'];
+    if (!Array.isArray(choices) || choices.length === 0) {
+      return null;
+    }
+
+    const first = choices[0] as Record<string, unknown>;
+    // message.content
+    const message = first['message'];
+    if (message && typeof message === 'object') {
+      const msg = message as Record<string, unknown>;
+      const content = msg['content'];
+      if (content !== undefined && content !== null) {
+        if (typeof content === 'object') return content;
+        if (typeof content === 'string') {
+          try {
+            return JSON.parse(content);
+          } catch {
+            return content;
+          }
+        }
+        return content;
       }
     }
-    return raw;
+
+    // fallback to top-level text
+    const text = first['text'];
+    if (typeof text === 'string') {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text;
+      }
+    }
+
+    // delta.content (streaming shape)
+    const delta = first['delta'];
+    if (delta && typeof delta === 'object') {
+      const deltaContent = (delta as Record<string, unknown>)['content'];
+      if (typeof deltaContent === 'string') {
+        try {
+          return JSON.parse(deltaContent);
+        } catch {
+          return deltaContent;
+        }
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -186,7 +234,7 @@ async function safeParseChoiceJson(data: any): Promise<any> {
 
 async function detectBias(text: string): Promise<BiasResult> {
   try {
-    const payload = {
+    const payload: Record<string, unknown> = {
       model: 'gpt-3.5-turbo',
       messages: [
         {
@@ -203,10 +251,11 @@ async function detectBias(text: string): Promise<BiasResult> {
     const data = await callOpenAIChat(payload);
     const parsed = await safeParseChoiceJson(data);
     if (parsed && typeof parsed === 'object') {
+      const p = parsed as Record<string, unknown>;
       return {
-        detected: Boolean(parsed.detected),
-        type: parsed.type ?? 'unknown',
-        explanation: parsed.explanation ?? String(parsed),
+        detected: Boolean(p['detected']),
+        type: String(p['type'] ?? 'unknown'),
+        explanation: String(p['explanation'] ?? String(parsed)),
       };
     }
 
@@ -220,7 +269,7 @@ async function detectBias(text: string): Promise<BiasResult> {
 
 async function extractKeyPoints(text: string): Promise<KeyPointsResult> {
   try {
-    const payload = {
+    const payload: Record<string, unknown> = {
       model: 'gpt-3.5-turbo',
       messages: [
         {
@@ -235,12 +284,13 @@ async function extractKeyPoints(text: string): Promise<KeyPointsResult> {
 
     const data = await callOpenAIChat(payload);
     const parsed = await safeParseChoiceJson(data);
+
     if (Array.isArray(parsed)) return parsed.slice(0, 5).map(String);
     if (typeof parsed === 'string') {
       return parsed
         .split(/\n+/)
-        .map((s: string) => s.replace(/^\s*[-–•\d.]+\s*/, '').trim())
-        .filter((s: string) => s)
+        .map((s) => s.replace(/^\s*[-–•\d.]+\s*/, '').trim())
+        .filter((s) => s)
         .slice(0, 5);
     }
     return [];
@@ -253,7 +303,7 @@ async function extractKeyPoints(text: string): Promise<KeyPointsResult> {
 
 async function extractEntities(text: string): Promise<EntitiesResult> {
   try {
-    const payload = {
+    const payload: Record<string, unknown> = {
       model: 'gpt-3.5-turbo',
       messages: [
         {
@@ -270,10 +320,11 @@ async function extractEntities(text: string): Promise<EntitiesResult> {
     const data = await callOpenAIChat(payload);
     const parsed = await safeParseChoiceJson(data);
     if (parsed && typeof parsed === 'object') {
+      const p = parsed as Record<string, unknown>;
       return {
-        people: Array.isArray(parsed.people) ? parsed.people.map(String) : [],
-        organizations: Array.isArray(parsed.organizations) ? parsed.organizations.map(String) : [],
-        locations: Array.isArray(parsed.locations) ? parsed.locations.map(String) : [],
+        people: Array.isArray(p['people']) ? (p['people'] as unknown[]).map(String) : [],
+        organizations: Array.isArray(p['organizations']) ? (p['organizations'] as unknown[]).map(String) : [],
+        locations: Array.isArray(p['locations']) ? (p['locations'] as unknown[]).map(String) : [],
       };
     }
 
@@ -287,7 +338,7 @@ async function extractEntities(text: string): Promise<EntitiesResult> {
 
 async function performFactCheck(text: string): Promise<FactCheckResult> {
   try {
-    const payload = {
+    const payload: Record<string, unknown> = {
       model: 'gpt-3.5-turbo',
       messages: [
         {
@@ -303,13 +354,18 @@ async function performFactCheck(text: string): Promise<FactCheckResult> {
 
     const data = await callOpenAIChat(payload);
     const parsed = await safeParseChoiceJson(data);
+
     if (parsed && typeof parsed === 'object') {
-      return {
-        claims: Array.isArray(parsed.claims) ? parsed.claims.map(String) : [],
-        veracity: Array.isArray(parsed.veracity)
-          ? parsed.veracity.map((v: any) => String(v) as 'verified' | 'unverified' | 'misleading')
-          : [],
-      };
+      const p = parsed as Record<string, unknown>;
+      const claims = Array.isArray(p['claims']) ? (p['claims'] as unknown[]).map(String) : [];
+      const veracityRaw = Array.isArray(p['veracity']) ? (p['veracity'] as unknown[]) : [];
+      const veracity = veracityRaw.map((v) => {
+        const s = String(v).toLowerCase();
+        if (s === 'verified') return 'verified' as const;
+        if (s === 'misleading') return 'misleading' as const;
+        return 'unverified' as const;
+      });
+      return { claims, veracity };
     }
 
     return { claims: [], veracity: [] };
@@ -322,7 +378,7 @@ async function performFactCheck(text: string): Promise<FactCheckResult> {
 
 async function extractTimeline(text: string): Promise<TimelineResult> {
   try {
-    const payload = {
+    const payload: Record<string, unknown> = {
       model: 'gpt-3.5-turbo',
       messages: [
         {
@@ -338,8 +394,21 @@ async function extractTimeline(text: string): Promise<TimelineResult> {
 
     const data = await callOpenAIChat(payload);
     const parsed = await safeParseChoiceJson(data);
-    if (parsed && parsed.events && Array.isArray(parsed.events) && parsed.events.length > 0) {
-      return parsed;
+    if (parsed && typeof parsed === 'object') {
+      const p = parsed as Record<string, unknown>;
+      if (Array.isArray(p['events']) && p['events'].length > 0) {
+        const events = (p['events'] as unknown[]).map((ev) => {
+          if (ev && typeof ev === 'object') {
+            const e = ev as Record<string, unknown>;
+            return {
+              date: typeof e['date'] === 'string' ? e['date'] : undefined,
+              description: String(e['description'] ?? ''),
+            };
+          }
+          return { date: undefined, description: String(ev ?? '') };
+        });
+        return { events };
+      }
     }
 
     return null;
@@ -356,7 +425,7 @@ async function extractTimeline(text: string): Promise<TimelineResult> {
  */
 async function buildSentimentDetails(text: string, overall: SentimentOverall): Promise<SentimentDetails> {
   try {
-    const payload = {
+    const payload: Record<string, unknown> = {
       model: 'gpt-3.5-turbo',
       messages: [
         {
@@ -377,25 +446,27 @@ async function buildSentimentDetails(text: string, overall: SentimentOverall): P
     const data = await callOpenAIChat(payload);
     const parsed = await safeParseChoiceJson(data);
     if (parsed && typeof parsed === 'object') {
-      const outOverall: SentimentOverall =
-        ['positive', 'negative', 'neutral'].includes((parsed.overall || '').toLowerCase())
-          ? (parsed.overall.toLowerCase() as SentimentOverall)
+      const p = parsed as Record<string, unknown>;
+
+      const outOverall =
+        typeof p['overall'] === 'string' && ['positive', 'negative', 'neutral'].includes(p['overall'].toLowerCase())
+          ? (p['overall'].toLowerCase() as SentimentOverall)
           : overall;
 
-      const scoreNum = typeof parsed.score === 'number' ? parsed.score : Number(parsed.score);
+      const scoreNum =
+        typeof p['score'] === 'number' ? p['score'] : Number(p['score'] ?? NaN);
       const score =
-        Number.isFinite(scoreNum) && scoreNum >= 0 && scoreNum <= 1
-          ? scoreNum
-          : defaultSentimentScore(overall);
+        Number.isFinite(scoreNum) && scoreNum >= 0 && scoreNum <= 1 ? scoreNum : defaultSentimentScore(overall);
 
-      const explanation = typeof parsed.explanation === 'string' && parsed.explanation.trim()
-        ? parsed.explanation.trim()
-        : defaultSentimentExplanation(overall);
+      const explanation =
+        typeof p['explanation'] === 'string' && p['explanation'].trim()
+          ? p['explanation'].trim()
+          : defaultSentimentExplanation(overall);
 
       return { overall: outOverall, score, explanation };
     }
-  } catch (err) {
-    // fall through to fallback
+  } catch (error) {
+    console.error('buildSentimentDetails error:', error);
   }
 
   return {
@@ -407,15 +478,21 @@ async function buildSentimentDetails(text: string, overall: SentimentOverall): P
 
 function defaultSentimentScore(overall: SentimentOverall): number {
   switch (overall) {
-    case 'positive': return 0.8;
-    case 'negative': return 0.2;
-    default: return 0.5;
+    case 'positive':
+      return 0.8;
+    case 'negative':
+      return 0.2;
+    default:
+      return 0.5;
   }
 }
 function defaultSentimentExplanation(overall: SentimentOverall): string {
   switch (overall) {
-    case 'positive': return 'Tone appears generally optimistic or favorable.';
-    case 'negative': return 'Tone appears critical, alarming, or unfavorable.';
-    default: return 'Language is mostly balanced with limited affect.';
+    case 'positive':
+      return 'Tone appears generally optimistic or favorable.';
+    case 'negative':
+      return 'Tone appears critical, alarming, or unfavorable.';
+    default:
+      return 'Language is mostly balanced with limited affect.';
   }
 }

@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 
-type ParsedBody = { articleId?: string };
+type ParsedBody = { articleId?: string; id?: string };
 
 /**
  * Robust helper to parse request body with fallbacks:
@@ -18,16 +18,23 @@ async function parseRequestBody(request: Request): Promise<ParsedBody> {
 
   // Try request.json() first (normal case)
   try {
-    if (contentType.includes('application/json')) {
-      const json = await request.json();
-      if (json && typeof json === 'object') return json as ParsedBody;
-    } else {
-      // Attempt json() anyway (some clients don't set header)
-      const maybeJson = await request.json().catch(() => null);
-      if (maybeJson && typeof maybeJson === 'object') return maybeJson as ParsedBody;
+    // Annotate as unknown to avoid implicit `any`
+    const json = (await request.json()) as unknown;
+    if (json && typeof json === 'object') {
+      return json as ParsedBody;
     }
   } catch {
-    // fall through to text parsing
+    // fall through to alternative parsing
+  }
+
+  // Some clients don't set content-type correctly; try json() again safely
+  try {
+    const maybeJson = await request.json().catch(() => null) as unknown | null;
+    if (maybeJson && typeof maybeJson === 'object') {
+      return maybeJson as ParsedBody;
+    }
+  } catch {
+    // ignore and fall through
   }
 
   // Fallback: try reading as text and parsing
@@ -37,7 +44,7 @@ async function parseRequestBody(request: Request): Promise<ParsedBody> {
 
     // Try parse as JSON string
     try {
-      const parsed = JSON.parse(text);
+      const parsed = JSON.parse(text) as unknown;
       if (parsed && typeof parsed === 'object') return parsed as ParsedBody;
     } catch {
       // Not JSON — try URLSearchParams (form-encoded)
@@ -45,6 +52,9 @@ async function parseRequestBody(request: Request): Promise<ParsedBody> {
         const params = new URLSearchParams(text);
         if (params.has('articleId')) {
           return { articleId: params.get('articleId') ?? undefined };
+        }
+        if (params.has('id')) {
+          return { id: params.get('id') ?? undefined };
         }
       } catch {
         // ignore
@@ -58,7 +68,7 @@ async function parseRequestBody(request: Request): Promise<ParsedBody> {
   return {};
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -68,7 +78,7 @@ export async function POST(request: Request) {
     const body = await parseRequestBody(request);
 
     // Accept both `articleId` or `id`
-    const articleIdRaw = (body.articleId ?? (body as any).id) as unknown;
+    const articleIdRaw = body.articleId ?? body.id;
 
     if (!articleIdRaw || typeof articleIdRaw !== 'string') {
       return NextResponse.json(
@@ -133,7 +143,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {

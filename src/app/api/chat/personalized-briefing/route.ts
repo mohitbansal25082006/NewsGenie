@@ -1,12 +1,52 @@
 // E:\newsgenie\src\app\api\chat\personalized-briefing\route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { generatePersonalizedBriefing } from '@/lib/openai';
 import { NewsAPI } from '@/lib/newsApi';
 
-export async function GET(request: NextRequest) {
+/**
+ * Types for NewsAPI responses (avoid `any`)
+ */
+interface NewsApiSource {
+  id?: string | null;
+  name: string;
+}
+
+interface NewsApiArticle {
+  source: NewsApiSource;
+  author?: string | null;
+  title?: string | null;
+  description?: string | null;
+  url: string;
+  urlToImage?: string | null;
+  publishedAt?: string | null;
+  content?: string | null;
+}
+
+interface NewsApiResponse {
+  status: 'ok' | 'error';
+  totalResults?: number;
+  articles?: NewsApiArticle[];
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Processed article type the AI expects
+ */
+interface ProcessedArticle {
+  title: string;
+  description?: string | null;
+  content?: string | null;
+  url: string;
+  publishedAt?: string | null;
+  source: string;
+  category: string;
+}
+
+export async function GET(): Promise<NextResponse> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -27,72 +67,66 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User preferences not found' }, { status: 404 });
     }
 
-    // Get the latest articles based on user preferences
-    const newsApi = new NewsAPI();
-    
-    // Fetch articles from multiple categories if user has interests
-    const categories = user.userPreference.interests.length > 0 
-      ? user.userPreference.interests.slice(0, 3) // Limit to top 3 interests
-      : ['general', 'business', 'technology']; // Default categories
+    // Build categories from user interests (defensive: ensure array)
+    const interests =
+      Array.isArray(user.userPreference.interests) && user.userPreference.interests.length > 0
+        ? user.userPreference.interests
+        : [];
 
-    const allArticles: any[] = [];
-    
-    // Fetch articles for each category
+    const categories: string[] =
+      interests.length > 0 ? interests.slice(0, 3) : ['general', 'business', 'technology'];
+
+    const allArticles: ProcessedArticle[] = [];
+    const newsApi = new NewsAPI();
+
+    // Helper to safely map NewsAPI article to our ProcessedArticle
+    const mapArticle = (a: NewsApiArticle, category: string): ProcessedArticle => ({
+      title: a.title ?? '',
+      description: a.description ?? null,
+      content: a.content ?? null,
+      url: a.url,
+      publishedAt: a.publishedAt ?? null,
+      source: a.source?.name ?? 'unknown',
+      category,
+    });
+
+    // Fetch articles by category
     for (const category of categories) {
       try {
-        const response = await newsApi.getTopHeadlines({
+        const response = (await newsApi.getTopHeadlines({
           category,
           country: user.userPreference.country,
-          pageSize: 5, // Get 5 articles per category
-        });
-        
-        if (response.status === 'ok' && response.articles) {
-          // Process and add articles
-          const processedArticles = response.articles.map((article: any) => ({
-            title: article.title,
-            description: article.description,
-            content: article.content,
-            url: article.url,
-            publishedAt: article.publishedAt,
-            source: article.source.name,
-            category: category,
-          }));
-          
-          allArticles.push(...processedArticles);
+          pageSize: 5,
+        })) as NewsApiResponse;
+
+        if (response.status === 'ok' && Array.isArray(response.articles)) {
+          const processed = response.articles.map((article) => mapArticle(article, category));
+          allArticles.push(...processed);
         }
       } catch (error) {
         console.error(`Error fetching articles for category ${category}:`, error);
       }
     }
 
-    // If we don't have enough articles from categories, try fetching everything with a query
+    // If not enough articles, fetch broader "everything" query
     if (allArticles.length < 10) {
       try {
-        const query = user.userPreference.interests.length > 0 
-          ? user.userPreference.interests.join(' OR ') 
-          : 'latest news';
-        
-        const response = await newsApi.getEverything({
+        const query =
+          interests.length > 0 ? interests.map((i) => i.trim()).filter(Boolean).join(' OR ') : 'latest news';
+
+        const response = (await newsApi.getEverything({
           q: query,
           language: user.userPreference.language,
           sortBy: 'publishedAt',
           pageSize: 20,
-        });
-        
-        if (response.status === 'ok' && response.articles) {
-          const processedArticles = response.articles.map((article: any) => ({
-            title: article.title,
-            description: article.description,
-            content: article.content,
-            url: article.url,
-            publishedAt: article.publishedAt,
-            source: article.source.name,
-            category: 'general', // Default category for everything query
-          }));
-          
-          // Add only unique articles
-          for (const article of processedArticles) {
-            if (!allArticles.some(a => a.url === article.url)) {
+        })) as NewsApiResponse;
+
+        if (response.status === 'ok' && Array.isArray(response.articles)) {
+          const processed = response.articles.map((article) => mapArticle(article, 'general'));
+
+          // Add unique articles by URL
+          for (const article of processed) {
+            if (!allArticles.some((a) => a.url === article.url)) {
               allArticles.push(article);
             }
           }
@@ -102,23 +136,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Sort all articles by published date (newest first) and take the latest 15
+    // Sort by published date (newest first). If missing date, push to the end.
     const latestArticles = allArticles
-      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      .slice()
+      .sort((a, b) => {
+        const at = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+        const bt = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+        return bt - at;
+      })
       .slice(0, 15);
 
-    // Format articles for the AI
-    const formattedArticles = latestArticles.map(article => ({
-      title: article.title,
-      summary: article.description || article.content?.substring(0, 200) || '',
-      category: article.category,
-      publishedAt: article.publishedAt,
-    }));
+    // Format for the AI — ensure publishedAt is always a string (fallback to current time)
+    const formattedArticles: { title: string; summary: string; category: string; publishedAt: string }[] =
+      latestArticles.map((article) => ({
+        title: article.title,
+        summary: article.description ?? article.content?.substring(0, 200) ?? '',
+        category: article.category,
+        publishedAt: article.publishedAt ?? new Date().toISOString(),
+      }));
 
-    // Generate briefing
     const briefing = await generatePersonalizedBriefing(
       {
-        interests: user.userPreference.interests,
+        interests: user.userPreference.interests ?? [],
         country: user.userPreference.country,
         language: user.userPreference.language,
       },
@@ -128,13 +167,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       briefing,
       articlesCount: latestArticles.length,
-      latestArticleDate: latestArticles[0]?.publishedAt || null,
+      latestArticleDate: latestArticles[0]?.publishedAt ?? null,
     });
   } catch (error) {
     console.error('Error creating personalized briefing:', error);
-    return NextResponse.json(
-      { error: 'Failed to create personalized briefing' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create personalized briefing' }, { status: 500 });
   }
 }

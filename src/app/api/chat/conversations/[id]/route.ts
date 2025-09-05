@@ -5,10 +5,35 @@ import { authOptions } from '@/lib/auth';
 import { getConversation, generateAndSaveResponse } from '@/lib/chat';
 import { NewsAPI } from '@/lib/newsApi';
 
+/** Types for NewsAPI responses to avoid `any` */
+interface NewsApiSource {
+  id?: string | null;
+  name?: string | null;
+}
+
+interface NewsApiArticle {
+  source?: NewsApiSource;
+  author?: string | null;
+  title?: string | null;
+  description?: string | null;
+  url?: string | null;
+  urlToImage?: string | null;
+  publishedAt?: string | null;
+  content?: string | null;
+}
+
+interface NewsApiResponse {
+  status: 'ok' | 'error' | string;
+  totalResults?: number;
+  articles?: NewsApiArticle[];
+  code?: string;
+  message?: string;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -29,17 +54,14 @@ export async function GET(
     } else {
       console.error('Error getting conversation (unknown):', error);
     }
-    return NextResponse.json(
-      { error: 'Failed to get conversation' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to get conversation' }, { status: 500 });
   }
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -48,17 +70,24 @@ export async function POST(
 
     const resolvedParams = await params;
 
-    // Parse request body safely (NextRequest.json() is fine in app router but guard)
-    let body: any = {};
+    // Parse request body safely without `any`
+    let body: Record<string, unknown> = {};
     try {
-      body = await request.json();
+      const parsed = await request.json().catch(() => null);
+      if (parsed && typeof parsed === 'object') {
+        body = parsed as Record<string, unknown>;
+      } else {
+        body = {};
+      }
     } catch {
-      // fall back to empty body
       body = {};
     }
 
-    const message: string = (body?.message ?? '').toString();
-    const prioritizeLatest: boolean = Boolean(body?.prioritizeLatest);
+    const rawMessage = ('message' in body ? body['message'] : undefined) as unknown;
+    const message = rawMessage == null ? '' : String(rawMessage);
+
+    const prioritizeLatestRaw = ('prioritizeLatest' in body ? body['prioritizeLatest'] : undefined) as unknown;
+    const prioritizeLatest = Boolean(prioritizeLatestRaw);
 
     if (!message || message.trim().length === 0) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -75,12 +104,12 @@ export async function POST(
       // If there are query terms, search specifically for them first
       if (queryTerms.length > 0) {
         try {
-          const searchResponse = await newsApi.getEverything({
-            q: queryTerms.map(t => `"${t}"`).join(' OR '),
+          const searchResponse = (await newsApi.getEverything({
+            q: queryTerms.map((t) => `"${t}"`).join(' OR '),
             language: 'en',
             sortBy: 'publishedAt',
             pageSize: 8,
-          });
+          })) as NewsApiResponse | null;
 
           if (searchResponse?.status === 'ok' && Array.isArray(searchResponse.articles) && searchResponse.articles.length > 0) {
             latestNewsContext = buildNewsContext(searchResponse.articles, {
@@ -96,10 +125,14 @@ export async function POST(
       // If still empty or the user explicitly wants latest, get top headlines as fallback
       if (!latestNewsContext || prioritizeLatest) {
         try {
-          const headlinesResponse = await newsApi.getTopHeadlines({
-            country: (session?.user as any)?.country || 'us',
+          // `session.user` may have extra custom fields; cast safely to narrow shape to access `country`
+          const userExtra = (session.user as unknown) as { country?: string };
+          const country = userExtra?.country ?? 'us';
+
+          const headlinesResponse = (await newsApi.getTopHeadlines({
+            country,
             pageSize: 10,
-          });
+          })) as NewsApiResponse | null;
 
           if (headlinesResponse?.status === 'ok' && Array.isArray(headlinesResponse.articles)) {
             const headlinesContext = buildNewsContext(headlinesResponse.articles, {
@@ -108,9 +141,7 @@ export async function POST(
             });
 
             // If we already had domain-specific results, append headlines as backup
-            latestNewsContext = latestNewsContext
-              ? latestNewsContext + '\n\n' + headlinesContext
-              : headlinesContext;
+            latestNewsContext = latestNewsContext ? `${latestNewsContext}\n\n${headlinesContext}` : headlinesContext;
           }
         } catch (err) {
           console.warn('newsApi.getTopHeadlines failed:', err);
@@ -129,11 +160,7 @@ export async function POST(
     const messageForAi = message + newsInstruction;
 
     // Ask chat layer to generate and save response
-    const result = await generateAndSaveResponse(
-      resolvedParams.id,
-      messageForAi,
-      session.user.id
-    );
+    const result = await generateAndSaveResponse(resolvedParams.id, messageForAi, session.user.id);
 
     return NextResponse.json(result);
   } catch (error: unknown) {
@@ -142,10 +169,7 @@ export async function POST(
     } else {
       console.error('Error generating response (unknown):', error);
     }
-    return NextResponse.json(
-      { error: 'Failed to generate response' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to generate response' }, { status: 500 });
   }
 }
 
@@ -153,12 +177,13 @@ export async function POST(
 
 /**
  * Build a compact news context with title, source, publishedAt (relative) and a short snippet.
+ * Accepts NewsApiArticle[] directly (handles nulls/undefined safely).
  * Returns a string ready to be appended to the AI prompt.
  */
 function buildNewsContext(
-  articles: Array<{ title?: string; description?: string; content?: string; source?: { name?: string }; publishedAt?: string; url?: string }>,
+  articles: NewsApiArticle[],
   opts: { header: string; maxItems?: number }
-) {
+): string {
   const maxItems = opts.maxItems ?? 6;
   const items = articles.slice(0, maxItems).map((a, i) => {
     const published = a.publishedAt ? formatDate(a.publishedAt) : 'unknown date';
@@ -166,7 +191,8 @@ function buildNewsContext(
     const snippet = sanitizeSnippet(a.description ?? a.content ?? '');
     const snippetShort = snippet.length > 140 ? snippet.slice(0, 137) + '...' : snippet;
     const safeTitle = (a.title ?? 'No title').replace(/\s+/g, ' ').trim();
-    return `${i + 1}. ${safeTitle} — ${source} (${published})${snippetShort ? ` — ${snippetShort}` : ''}${a.url ? ` — ${a.url}` : ''}`;
+    const urlPart = a.url ? ` — ${a.url}` : '';
+    return `${i + 1}. ${safeTitle} — ${source} (${published})${snippetShort ? ` — ${snippetShort}` : ''}${urlPart}`;
   });
 
   return `${opts.header}:\n${items.join('\n')}`;
@@ -196,7 +222,7 @@ function extractSearchTerms(message: string): string[] {
 
   // Find multi-word capitalized sequences (e.g., "United States", "Elon Musk")
   const capSeqRegex = /\b([A-Z][a-z]{1,}\b(?:\s+[A-Z][a-z]{1,}\b){0,3})/g;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = capSeqRegex.exec(message)) !== null) {
     const t = match[1].trim();
     if (t.length > 2) terms.add(t);
@@ -207,15 +233,15 @@ function extractSearchTerms(message: string): string[] {
     const words = message
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter(w => w.length > 3);
-    words.slice(0, 4).forEach(w => terms.add(w));
+      .filter((w) => w.length > 3);
+    words.slice(0, 4).forEach((w) => terms.add(w));
   }
 
   return Array.from(terms).slice(0, 6);
 }
 
 /** Get human-friendly relative date or short date */
-function formatDate(dateString: string) {
+function formatDate(dateString: string): string {
   try {
     const d = new Date(dateString);
     const diffMs = Date.now() - d.getTime();
@@ -232,8 +258,5 @@ function formatDate(dateString: string) {
 /** Very small sanitizer to produce readable snippet text from HTML-ish content */
 function sanitizeSnippet(input?: string): string {
   if (!input) return '';
-  return input
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
