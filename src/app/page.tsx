@@ -13,7 +13,6 @@ import {
   Globe, 
   BarChart3,
   Sparkles,
-  Newspaper,
   ArrowRight,
   Github,
   Chrome,
@@ -26,7 +25,6 @@ import {
   Target,
   FileText,
   Clock,
-  Award,
   ChevronDown,
   ChevronUp,
   Bell,
@@ -51,7 +49,7 @@ export default function HomePage() {
     try {
       await signIn(provider, { callbackUrl: "/dashboard" });
       toast.success("Signing you in...");
-    } catch (error) {
+    } catch {
       toast.error("Failed to sign in. Please try again.");
     }
   };
@@ -370,7 +368,7 @@ export default function HomePage() {
                 
                 <div className="space-y-4">
                   <div className="bg-slate-100 dark:bg-slate-700 rounded-lg p-4 max-w-[80%]">
-                    <p className="text-sm">Hello! I'm your AI news assistant. How can I help you today?</p>
+                    <p className="text-sm">Hello! I&apos;m your AI news assistant. How can I help you today?</p>
                   </div>
                   
                   <div className="bg-slate-100 dark:bg-slate-700 rounded-lg p-4 max-w-[80%] ml-auto">
@@ -378,7 +376,7 @@ export default function HomePage() {
                   </div>
                   
                   <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 max-w-[80%] border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm">Certainly! Here's a summary of today's top tech stories: [AI-generated summary would appear here]</p>
+                    <p className="text-sm">Certainly! Here&apos;s a summary of today&apos;s top tech stories: [AI-generated summary would appear here]</p>
                   </div>
                 </div>
                 
@@ -582,7 +580,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-slate-600 dark:text-slate-300 mb-6 italic">
-                    "{testimonial.content}"
+                    &ldquo;{testimonial.content}&rdquo;
                   </p>
                   <div className="flex items-center">
                     <div className="bg-slate-200 dark:bg-slate-700 rounded-full w-10 h-10 flex items-center justify-center mr-3">
