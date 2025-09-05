@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, Bell } from "lucide-react";
+import { User, Settings, LogOut, Bell, MessageSquare } from "lucide-react";
 import Link from "next/link";
 
 export function UserMenu() {
@@ -55,6 +55,12 @@ export function UserMenu() {
           <Link href="/dashboard">
             <User className="mr-2 h-4 w-4" />
             <span>Dashboard</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/chat">
+            <MessageSquare className="mr-2 h-4 w-4" />
+            <span>AI Chat</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

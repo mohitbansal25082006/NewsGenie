@@ -24,6 +24,7 @@ model User {
   readArticles   ReadArticle[]
   readingHistory ReadingHistory[]
   notifications  Notification[]
+  conversations  Conversation[]
   @@map("users")
 }
 model Account {
@@ -164,4 +165,28 @@ model Notification {
   articleId   String?
   article     Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
   @@map("notifications")
+}
+// ================== CONVERSATIONAL AI ==================
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String   @default("New Conversation")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // Relations
+  messages   Message[]
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String   // 'user' or 'assistant'
+  content        String
+  createdAt      DateTime @default(now())
+  // Optional: reference to related articles
+  articleIds     String[] // JSON array of article IDs
+  @@map("messages")
 }

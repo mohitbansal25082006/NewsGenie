@@ -50,6 +50,18 @@ export default function RootLayout({
                   Categories
                 </Link>
                 <Link
+                  href="/dashboard"
+                  className="text-gray-700 hover:text-blue-600 transition"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/chat"
+                  className="text-gray-700 hover:text-blue-600 transition"
+                >
+                  AI Chat
+                </Link>
+                <Link
                   href="/trending"
                   className="text-gray-700 hover:text-blue-600 transition"
                 >

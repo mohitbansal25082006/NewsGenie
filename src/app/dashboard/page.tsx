@@ -13,12 +13,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { Search, BookmarkPlus, BookmarkCheck, ExternalLink, TrendingUp, Calendar, Heart, Eye, Settings, Loader2, BookOpen, ChevronDown } from 'lucide-react';
+import { Search, BookmarkPlus, BookmarkCheck, ExternalLink, TrendingUp, Calendar, Heart, Eye, Settings, Loader2, BookOpen, ChevronDown, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import toast, { Toaster } from 'react-hot-toast';
-
 interface Article {
   id: string;
   title: string;
@@ -32,7 +31,6 @@ interface Article {
   sentiment?: string;
   keywords?: string[];
 }
-
 interface Bookmark {
   id: string;
   userId: string;
@@ -40,7 +38,6 @@ interface Bookmark {
   createdAt: string;
   article: Article;
 }
-
 interface Analytics {
   readingStats: { date: string; count: number }[];
   categoryDistribution: Record<string, number>;
@@ -49,14 +46,11 @@ interface Analytics {
   totalBookmarks: number;
   todayRead: number;
 }
-
 const CATEGORIES = [
   'general', 'business', 'entertainment', 'health', 
   'science', 'sports', 'technology'
 ];
-
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
-
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -69,14 +63,12 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Article[]>([]);
   const [searching, setSearching] = useState(false);
-
   // Redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
       redirect('/');
     }
   }, [status]);
-
   // Fetch news articles
   const fetchNews = useCallback(async (selectedCategory = category, query = '') => {
     setLoading(true);
@@ -108,7 +100,6 @@ export default function DashboardPage() {
       setSearching(false);
     }
   }, [category]);
-
   // Fetch analytics
   const fetchAnalytics = useCallback(async () => {
     setAnalyticsLoading(true);
@@ -128,7 +119,6 @@ export default function DashboardPage() {
       setAnalyticsLoading(false);
     }
   }, []);
-
   // Fetch bookmarks
   const fetchBookmarks = useCallback(async () => {
     try {
@@ -143,7 +133,6 @@ export default function DashboardPage() {
       console.error('Error fetching bookmarks:', error);
     }
   }, []);
-
   // Toggle bookmark
   const toggleBookmark = async (articleId: string) => {
     try {
@@ -181,7 +170,6 @@ export default function DashboardPage() {
       toast.error('Error updating bookmark');
     }
   };
-
   // Mark article as read
   const markAsRead = async (articleId: string) => {
     try {
@@ -196,7 +184,6 @@ export default function DashboardPage() {
       console.error('Error marking article as read:', error);
     }
   };
-
   // Handle search
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,13 +194,11 @@ export default function DashboardPage() {
     setSearching(true);
     await fetchNews(category, searchQuery);
   };
-
   // Clear search
   const clearSearch = () => {
     setSearchQuery('');
     setSearchResults([]);
   };
-
   // Handle category change
   const handleCategoryChange = (newCategory: string) => {
     setCategory(newCategory);
@@ -221,7 +206,6 @@ export default function DashboardPage() {
     setSearchResults([]);
     fetchNews(newCategory);
   };
-
   // Load data on component mount
   useEffect(() => {
     if (session) {
@@ -230,7 +214,6 @@ export default function DashboardPage() {
       fetchBookmarks();
     }
   }, [session, fetchNews, fetchAnalytics, fetchBookmarks]);
-
   // Article Card Component
   const ArticleCard = ({ article }: { article: Article }) => {
     const isBookmarked = bookmarks.includes(article.id);
@@ -375,7 +358,6 @@ export default function DashboardPage() {
       </Card>
     );
   };
-
   // Loading Skeleton
   const LoadingSkeleton = () => (
     <div className="space-y-4">
@@ -399,7 +381,6 @@ export default function DashboardPage() {
       ))}
     </div>
   );
-
   // Analytics Charts
   const renderAnalytics = () => {
     if (analyticsLoading) {
@@ -586,7 +567,6 @@ export default function DashboardPage() {
       </div>
     );
   };
-
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -597,7 +577,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
@@ -616,6 +595,12 @@ export default function DashboardPage() {
               <Button variant="outline" size="sm">
                 <Heart className="h-4 w-4 mr-2" />
                 Bookmarks ({bookmarks.length})
+              </Button>
+            </Link>
+            <Link href="/chat">
+              <Button variant="outline" size="sm">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                AI Chat
               </Button>
             </Link>
             <Link href="/dashboard/preferences">

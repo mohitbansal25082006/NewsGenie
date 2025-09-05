@@ -3,11 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, BookmarkPlus, BookmarkCheck, ExternalLink, Share, Clock, User, Calendar } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, BookmarkPlus, BookmarkCheck, ExternalLink, Share, Clock, User, Calendar, Send, Bot, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -36,6 +39,13 @@ interface Bookmark {
   createdAt: string;
 }
 
+interface QAMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: Date;
+}
+
 export default function ArticlePage() {
   const { data: session } = useSession();
   const params = useParams();
@@ -47,6 +57,10 @@ export default function ArticlePage() {
   const [loading, setLoading] = useState(true);
   const [relatedLoading, setRelatedLoading] = useState(true);
   const [bookmarked, setBookmarked] = useState(false);
+  const [qaMessages, setQaMessages] = useState<QAMessage[]>([]);
+  const [question, setQuestion] = useState('');
+  const [isAsking, setIsAsking] = useState(false);
+  const [showQA, setShowQA] = useState(false);
   
   const fetchArticle = useCallback(async () => {
     setLoading(true);
@@ -168,6 +182,63 @@ export default function ArticlePage() {
       // Fallback: copy to clipboard
       navigator.clipboard.writeText(article?.url || '');
       toast.success('Link copied to clipboard');
+    }
+  };
+  
+  const askQuestion = async () => {
+    if (!question.trim() || !session || isAsking) return;
+    
+    setIsAsking(true);
+    const userQuestion = question;
+    setQuestion('');
+    
+    // Add user message
+    const userMessage: QAMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: userQuestion,
+      createdAt: new Date(),
+    };
+    setQaMessages([...qaMessages, userMessage]);
+    
+    try {
+      const response = await fetch('/api/chat/article-qa', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          articleId,
+          question: userQuestion,
+        }),
+      });
+      
+      if (response.ok) {
+        const { answer } = await response.json();
+        
+        // Add assistant message
+        const assistantMessage: QAMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: answer,
+          createdAt: new Date(),
+        };
+        setQaMessages(prev => [...prev, assistantMessage]);
+      } else {
+        toast.error('Failed to get answer');
+      }
+    } catch (error) {
+      console.error('Error asking question:', error);
+      toast.error('Error asking question');
+    } finally {
+      setIsAsking(false);
+    }
+  };
+  
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      askQuestion();
     }
   };
   
@@ -324,6 +395,16 @@ export default function ArticlePage() {
               View Original
             </a>
           </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowQA(!showQA)}
+            className="flex items-center"
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Ask AI
+          </Button>
         </div>
         
         {/* AI Summary */}
@@ -334,6 +415,87 @@ export default function ArticlePage() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-700">{article.summary}</p>
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* Article Q&A */}
+        {showQA && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <MessageSquare className="h-5 w-5 mr-2" />
+                Ask About This Article
+              </CardTitle>
+              <CardDescription>
+                Ask questions about this article and get AI-powered answers
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {qaMessages.length > 0 && (
+                <ScrollArea className="h-64 p-2 border rounded-lg">
+                  <div className="space-y-4">
+                    {qaMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex ${
+                          msg.role === 'user' ? 'justify-end' : 'justify-start'
+                        }`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-lg p-3 ${
+                            msg.role === 'user'
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-start space-x-2">
+                            {msg.role === 'assistant' && (
+                              <Bot className="h-5 w-5 mt-0.5 text-blue-500" />
+                            )}
+                            <div>
+                              <p className="whitespace-pre-wrap">{msg.content}</p>
+                              <div
+                                className={`text-xs mt-1 ${
+                                  msg.role === 'user'
+                                    ? 'text-blue-100'
+                                    : 'text-gray-500'
+                                }`}
+                              >
+                                {format(msg.createdAt, 'h:mm a')}
+                              </div>
+                            </div>
+                            {msg.role === 'user' && (
+                              <User className="h-5 w-5 mt-0.5 text-blue-200" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+              
+              <div className="flex space-x-2">
+                <Input
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Ask a question about this article..."
+                  disabled={isAsking}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={askQuestion}
+                  disabled={!question.trim() || isAsking}
+                >
+                  {isAsking ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
