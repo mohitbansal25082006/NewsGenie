@@ -9,8 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, BookmarkPlus, BookmarkCheck, ExternalLink, Share, Clock, User, Calendar, Send, Bot, MessageSquare, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  ArrowLeft, BookmarkPlus, BookmarkCheck, ExternalLink, Share, Clock, User, Calendar, 
+  Send, Bot, MessageSquare, Loader2, Brain, CheckCircle, AlertTriangle, 
+  Globe, Users, Lightbulb, FileText
+} from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -28,7 +32,7 @@ interface Article {
   author: string;
   category: string;
   summary?: string;
-  sentiment?: string;
+  sentiment?: 'positive' | 'negative' | 'neutral' | string;
   keywords?: string[];
 }
 
@@ -47,6 +51,47 @@ interface QAMessage {
   sources?: string[];
 }
 
+type SentimentOverall = 'positive' | 'negative' | 'neutral';
+
+interface AnalysisData {
+  summary: string;
+  // Keep sentiment string for badges/compat
+  sentiment?: SentimentOverall | string;
+  // New structured details for the Sentiment tab
+  sentimentDetails?: {
+    overall: SentimentOverall;
+    score: number; // 0..1
+    explanation: string;
+  };
+  bias?: {
+    detected: boolean;
+    type: string;
+    explanation: string;
+  };
+  keyPoints: string[];
+  entities: {
+    people: string[];
+    organizations: string[];
+    locations: string[];
+  };
+  factCheck: {
+    claims: string[];
+    veracity: ('verified' | 'unverified' | 'misleading')[];
+  };
+  timeline?: {
+    events: {
+      date?: string;
+      description: string;
+    }[];
+  } | null;
+  translations?: {
+    [language: string]: {
+      title: string;
+      summary: string;
+    };
+  };
+}
+
 export default function ArticlePage() {
   const { data: session } = useSession();
   const params = useParams();
@@ -63,15 +108,16 @@ export default function ArticlePage() {
   const [isAsking, setIsAsking] = useState(false);
   const [showQA, setShowQA] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   
   const fetchArticle = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/article/${articleId}`);
       if (response.ok) {
-        const data = await response.json();
+        const data: Article = await response.json();
         setArticle(data);
-        // Mark article as read
         if (session) {
           markAsRead(articleId);
         }
@@ -181,7 +227,6 @@ export default function ArticlePage() {
         url: article?.url,
       });
     } else {
-      // Fallback: copy to clipboard
       navigator.clipboard.writeText(article?.url || '');
       toast.success('Link copied to clipboard');
     }
@@ -199,16 +244,25 @@ export default function ArticlePage() {
         },
         body: JSON.stringify({ 
           articleId: article.id,
-          url: article.url
+          url: article.url,
+          deepAnalysis: true
         }),
       });
       
       if (response.ok) {
-        const data = await response.json();
-        
-        // Update article with new analysis data
-        setArticle(prev => prev ? { ...prev, ...data } : null);
-        toast.success('Article analysis updated');
+        const data: AnalysisData = await response.json();
+        setAnalysisData(data);
+        setShowAnalysis(true);
+
+        // Only update safe fields on the Article object to avoid type collisions.
+        setArticle(prev => prev ? {
+          ...prev,
+          summary: data.summary ?? prev.summary,
+          sentiment: (data.sentiment as Article['sentiment']) ?? prev.sentiment,
+          keywords: data.entities ? prev.keywords : prev.keywords, // keep existing unless you also return keywords
+        } : null);
+
+        toast.success('Article analysis completed');
       } else {
         toast.error('Failed to analyze article');
       }
@@ -227,14 +281,13 @@ export default function ArticlePage() {
     const userQuestion = question;
     setQuestion('');
     
-    // Add user message
     const userMessage: QAMessage = {
       id: Date.now().toString(),
       role: 'user',
       content: userQuestion,
       createdAt: new Date(),
     };
-    setQaMessages([...qaMessages, userMessage]);
+    setQaMessages(prev => [...prev, userMessage]);
     
     try {
       const response = await fetch('/api/article/qa', {
@@ -251,8 +304,6 @@ export default function ArticlePage() {
       
       if (response.ok) {
         const { answer, sources } = await response.json();
-        
-        // Add assistant message
         const assistantMessage: QAMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
@@ -276,6 +327,32 @@ export default function ArticlePage() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       askQuestion();
+    }
+  };
+  
+  const getSentimentColor = (sentiment?: string) => {
+    switch (sentiment) {
+      case 'positive': return 'text-green-600 bg-green-50';
+      case 'negative': return 'text-red-600 bg-red-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
+  
+  const getBiasColor = (type: string) => {
+    switch (type) {
+      case 'political': return 'text-purple-600 bg-purple-50';
+      case 'commercial': return 'text-blue-600 bg-blue-50';
+      case 'sensational': return 'text-orange-600 bg-orange-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
+  
+  const getVeracityColor = (veracity: string) => {
+    switch (veracity) {
+      case 'verified': return 'text-green-600 bg-green-50';
+      case 'unverified': return 'text-yellow-600 bg-yellow-50';
+      case 'misleading': return 'text-red-600 bg-red-50';
+      default: return 'text-gray-600 bg-gray-50';
     }
   };
   
@@ -339,14 +416,16 @@ export default function ArticlePage() {
         <div className="mb-6">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <Badge variant="secondary">{article.source}</Badge>
-            <Badge 
-              variant={
-                article.sentiment === 'positive' ? 'default' :
-                article.sentiment === 'negative' ? 'destructive' : 'secondary'
-              }
-            >
-              {article.sentiment}
-            </Badge>
+            {article.sentiment && (
+              <Badge 
+                variant={
+                  article.sentiment === 'positive' ? 'default' :
+                  article.sentiment === 'negative' ? 'destructive' : 'secondary'
+                }
+              >
+                {article.sentiment}
+              </Badge>
+            )}
             <Badge variant="outline">{article.category}</Badge>
           </div>
           
@@ -380,7 +459,7 @@ export default function ArticlePage() {
               className="object-cover"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
+                if (target?.style) target.style.display = 'none';
               }}
             />
           </div>
@@ -443,7 +522,7 @@ export default function ArticlePage() {
             {isAnalyzing ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
-              <Bot className="h-4 w-4 mr-2" />
+              <Brain className="h-4 w-4 mr-2" />
             )}
             Analyze
           </Button>
@@ -471,6 +550,163 @@ export default function ArticlePage() {
           </Card>
         )}
         
+        {/* Analysis Results */}
+        {showAnalysis && analysisData && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Brain className="h-5 w-5 mr-2" />
+                Advanced Article Analysis
+              </CardTitle>
+              <CardDescription>
+                Comprehensive analysis powered by AI
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="sentiment">Sentiment</TabsTrigger>
+                  <TabsTrigger value="entities">Entities</TabsTrigger>
+                  <TabsTrigger value="fact-check">Fact Check</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="overview" className="space-y-4">
+                  {analysisData.keyPoints?.length ? (
+                    <div>
+                      <h3 className="font-semibold mb-2">Key Points</h3>
+                      <ul className="space-y-2">
+                        {analysisData.keyPoints.map((point, index) => (
+                          <li key={index} className="flex items-start">
+                            <Lightbulb className="h-4 w-4 mt-0.5 mr-2 text-yellow-500 flex-shrink-0" />
+                            <span className="text-sm">{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  
+                  {analysisData.bias?.detected && (
+                    <div>
+                      <h3 className="font-semibold mb-2">Bias Detection</h3>
+                      <div className={`p-3 rounded-lg ${getBiasColor(analysisData.bias.type)}`}>
+                        <div className="flex items-center mb-2">
+                          <AlertTriangle className="h-4 w-4 mr-2" />
+                          <span className="font-medium">{analysisData.bias.type} bias detected</span>
+                        </div>
+                        <p className="text-sm">{analysisData.bias.explanation}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {analysisData.timeline && analysisData.timeline.events?.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2">Timeline</h3>
+                      <div className="space-y-2">
+                        {analysisData.timeline.events.map((event, index) => (
+                          <div key={index} className="flex items-start">
+                            <div className="flex-shrink-0 w-20 text-sm text-gray-500">
+                              {event.date ? format(new Date(event.date), 'MMM d') : '—'}
+                            </div>
+                            <div className="text-sm">{event.description}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="sentiment" className="space-y-4">
+                  {analysisData.sentimentDetails ? (
+                    <div className={`p-4 rounded-lg ${getSentimentColor(analysisData.sentimentDetails.overall)}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold">Overall Sentiment</h3>
+                        <Badge variant="outline">{analysisData.sentimentDetails.overall}</Badge>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                        <div 
+                          className="h-2 rounded-full bg-current"
+                          style={{ width: `${Math.max(0, Math.min(1, analysisData.sentimentDetails.score)) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-sm">{analysisData.sentimentDetails.explanation}</p>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-600">
+                      Sentiment details are not available yet. Click <span className="font-medium">Analyze</span> to run deep analysis.
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="entities" className="space-y-4">
+                  {analysisData.entities?.people?.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2 flex items-center">
+                        <Users className="h-4 w-4 mr-2" />
+                        People Mentioned
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {analysisData.entities.people.map((person, index) => (
+                          <Badge key={index} variant="outline">{person}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {analysisData.entities?.organizations?.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2 flex items-center">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Organizations
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {analysisData.entities.organizations.map((org, index) => (
+                          <Badge key={index} variant="outline">{org}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {analysisData.entities?.locations?.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2 flex items-center">
+                        <Globe className="h-4 w-4 mr-2" />
+                        Locations
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {analysisData.entities.locations.map((location, index) => (
+                          <Badge key={index} variant="outline">{location}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="fact-check" className="space-y-4">
+                  <h3 className="font-semibold mb-2 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Fact Check Results
+                  </h3>
+                  <div className="space-y-3">
+                    {analysisData.factCheck?.claims?.length ? (
+                      analysisData.factCheck.claims.map((claim, index) => (
+                        <div key={index} className={`p-3 rounded-lg ${getVeracityColor(analysisData.factCheck.veracity[index])}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-sm">{claim}</span>
+                            <Badge variant="outline">{analysisData.factCheck.veracity[index]}</Badge>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-600">No fact-checkable claims were detected.</div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
+        
         {/* Article Q&A */}
         {showQA && (
           <Card className="mb-6">
@@ -490,9 +726,7 @@ export default function ArticlePage() {
                     {qaMessages.map((msg) => (
                       <div
                         key={msg.id}
-                        className={`flex ${
-                          msg.role === 'user' ? 'justify-end' : 'justify-start'
-                        }`}
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
                           className={`max-w-[80%] rounded-lg p-3 ${
@@ -522,9 +756,7 @@ export default function ArticlePage() {
                               )}
                               <div
                                 className={`text-xs mt-1 ${
-                                  msg.role === 'user'
-                                    ? 'text-blue-100'
-                                    : 'text-gray-500'
+                                  msg.role === 'user' ? 'text-blue-100' : 'text-gray-500'
                                 }`}
                               >
                                 {format(msg.createdAt, 'h:mm a')}
@@ -574,6 +806,9 @@ export default function ArticlePage() {
                     </Badge>
                     <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setQuestion("What are the implications of this news?")}>
                       What are the implications?
+                    </Badge>
+                    <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setQuestion("Is there any bias in this article?")}>
+                      Is there bias?
                     </Badge>
                   </div>
                 </div>
