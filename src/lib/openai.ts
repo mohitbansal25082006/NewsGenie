@@ -1,215 +1,268 @@
 // E:\newsgenie\src\lib\openai.ts
 import OpenAI from 'openai';
 
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+// Make the model configurable via env. Default to a reliable production model you have access to.
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
+
+// instantiate client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: OPENAI_API_KEY,
 });
 
-export async function summarizeArticle(content: string): Promise<string> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "You are a professional news summarizer. Create concise, informative summaries of news articles in 2-3 sentences. Focus on the key facts and main points."
-        },
-        {
-          role: "user",
-          content: `Please summarize this news article:\n\n${content}`
-        }
-      ],
-      max_tokens: 150,
-      temperature: 0.3,
-    });
-    return response.choices[0]?.message?.content || "Summary not available.";
-  } catch (error) {
-    console.error('OpenAI summarization error:', error);
-    return "Summary not available.";
-  }
-}
+/* -------------------------
+   Basic utilities & types
+   ------------------------- */
 
-export async function analyzeSentiment(text: string): Promise<'positive' | 'negative' | 'neutral'> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "Analyze the sentiment of the given text. Respond with only one word: 'positive', 'negative', or 'neutral'."
-        },
-        {
-          role: "user",
-          content: text
-        }
-      ],
-      max_tokens: 10,
-      temperature: 0,
-    });
-    const sentiment = response.choices[0]?.message?.content?.toLowerCase().trim();
-    return sentiment === 'positive' || sentiment === 'negative' ? sentiment : 'neutral';
-  } catch (error) {
-    console.error('OpenAI sentiment analysis error:', error);
-    return 'neutral';
-  }
-}
-
-export async function extractKeywords(text: string): Promise<string[]> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "Extract 3-5 key keywords or phrases from the given text. Return them as a comma-separated list."
-        },
-        {
-          role: "user",
-          content: text
-        }
-      ],
-      max_tokens: 50,
-      temperature: 0.3,
-    });
-    const keywords = response.choices[0]?.message?.content;
-    return keywords ? keywords.split(',').map(k => k.trim()) : [];
-  } catch (error) {
-    console.error('OpenAI keyword extraction error:', error);
-    return [];
-  }
-}
-
-// New conversational AI functions
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
+/* -------------------------
+   Simple article functions
+   ------------------------- */
+
+/**
+ * Summarize an article into 2-3 factual sentences.
+ */
+export async function summarizeArticle(content: string): Promise<string> {
+  try {
+    const system = `You are a professional news summarizer. Produce a concise factual summary in 2-3 sentences that covers the main facts: who, what, when, where, and why/impact if available. Do not hallucinate; if information is missing, say "Not stated in the article."`;
+    const response = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: `Article:\n\n${content}` },
+      ],
+      max_tokens: 220,
+      temperature: 0.15,
+    });
+
+    return (
+      response.choices?.[0]?.message?.content?.trim() ??
+      'Summary not available.'
+    );
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('OpenAI summarization error:', error.message);
+    } else {
+      console.error('OpenAI summarization unknown error:', error);
+    }
+    return 'Summary not available.';
+  }
+}
+
+/**
+ * Return one of: 'positive' | 'negative' | 'neutral'.
+ */
+export async function analyzeSentiment(
+  text: string
+): Promise<'positive' | 'negative' | 'neutral'> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content:
+            "You will analyze the sentiment of the provided text. Reply with exactly one word: positive, negative, or neutral.",
+        },
+        { role: 'user', content: text },
+      ],
+      max_tokens: 6,
+      temperature: 0,
+    });
+
+    const raw = response.choices?.[0]?.message?.content?.toLowerCase().trim();
+    if (raw === 'positive' || raw === 'negative') return raw;
+    return 'neutral';
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI sentiment error:', error.message);
+    else console.error('OpenAI sentiment unknown error:', error);
+    return 'neutral';
+  }
+}
+
+/**
+ * Extract 3-6 keywords/phrases from text as an array.
+ */
+export async function extractKeywords(text: string): Promise<string[]> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Extract 3 to 6 concise keywords or short phrases that capture the main topics of the text. Return them as a single comma-separated line.',
+        },
+        { role: 'user', content: text },
+      ],
+      max_tokens: 80,
+      temperature: 0.2,
+    });
+
+    const content = response.choices?.[0]?.message?.content ?? '';
+    return content
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 6);
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI keywords error:', error.message);
+    else console.error('OpenAI keywords unknown error:', error);
+    return [];
+  }
+}
+
+/* -------------------------
+   Conversational/chat APIs
+   ------------------------- */
+
+/**
+ * Generate a chat response given messages and optional article context.
+ * articleContext: array of short strings like "1) Title — Source (date) — snippet — url"
+ */
 export async function generateChatResponse(
   messages: ChatMessage[],
   articleContext?: string[]
 ): Promise<string> {
   try {
-    // Build system message based on context
-    let systemMessage = "You are NewsGenie, an AI assistant that helps users understand news and current events. Be helpful, informative, and concise.";
-    
+    let systemMessage =
+      'You are NewsGenie, an expert news assistant. Provide clear, accurate, and well-sourced answers. Avoid hallucination. When provided with news context, prefer facts from that context and cite sources inline (Source, date). If something is not supported by provided context, clearly state that.';
+
     if (articleContext && articleContext.length > 0) {
-      systemMessage += `\n\nYou have access to the following articles for context:\n${articleContext.join('\n\n')}`;
+      // Keep context compact to fit tokens
+      const ctx = articleContext.slice(0, 6).join('\n');
+      systemMessage += `\n\nContext (use when relevant):\n${ctx}`;
     }
-    
-    // Add system message to the beginning of messages array
-    const apiMessages: ChatMessage[] = [
+
+    const payloadMessages: ChatMessage[] = [
       { role: 'system', content: systemMessage },
-      ...messages.filter(msg => msg.role !== 'system') // Filter out any existing system messages
+      ...messages.filter((m) => m.role !== 'system'),
     ];
-    
+
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: apiMessages,
-      max_tokens: 1000,
-      temperature: 0.7,
+      model: OPENAI_MODEL,
+      messages: payloadMessages,
+      max_tokens: 1100,
+      temperature: 0.25,
     });
-    
-    return response.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-  } catch (error) {
-    console.error('OpenAI chat error:', error);
+
+    return response.choices?.[0]?.message?.content ?? "I'm sorry, I couldn't generate a response.";
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI chat error:', error.message);
+    else console.error('OpenAI chat unknown error:', error);
     return "I'm experiencing technical difficulties. Please try again later.";
   }
 }
 
+/**
+ * Compatibility wrapper intended to be used by your chat layer (e.g., generateAndSaveResponse in /lib/chat).
+ * If you already have a generateAndSaveResponse implementation, call generateChatResponse directly there.
+ */
+export async function generateAndSaveResponse(
+  conversationId: string,
+  userMessage: string,
+  userId: string,
+  articleContext?: string[]
+): Promise<{ reply: string; saved?: boolean }> {
+  try {
+    const reply = await generateChatResponse([{ role: 'user', content: userMessage }], articleContext);
+    // NOTE: This wrapper does not save to DB — your '@/lib/chat' should handle DB persistence.
+    return { reply, saved: false };
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('generateAndSaveResponse error:', error.message);
+    else console.error('generateAndSaveResponse unknown error:', error);
+    return { reply: "I'm experiencing technical difficulties. Please try again later.", saved: false };
+  }
+}
+
+/* -------------------------
+   Article Q&A + scraping-aware
+   ------------------------- */
+
+/**
+ * Answer a question strictly using the provided article content. If answer is not present, say "Not stated in the article."
+ */
 export async function answerQuestionAboutArticle(
   question: string,
   articleContent: string
 ): Promise<string> {
   try {
+    const system = 'You answer questions strictly from the provided article text. If the answer is not present, respond: "Not stated in the article." Provide detail when available.';
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: OPENAI_MODEL,
       messages: [
-        {
-          role: "system",
-          content: "You are an AI assistant that answers questions about news articles. Base your answers only on the information provided in the article. If the information is not in the article, say so. Be comprehensive and provide detailed answers when possible."
-        },
-        {
-          role: "user",
-          content: `Article content:\n${articleContent}\n\nQuestion: ${question}`
-        }
+        { role: 'system', content: system },
+        { role: 'user', content: `Article:\n${articleContent}\n\nQuestion: ${question}` },
       ],
       max_tokens: 800,
-      temperature: 0.3,
+      temperature: 0.15,
     });
-    
-    return response.choices[0]?.message?.content || "I couldn't answer that question based on the article content.";
-  } catch (error) {
-    console.error('OpenAI article Q&A error:', error);
+
+    return response.choices?.[0]?.message?.content ?? "I couldn't answer that question based on the article content.";
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI QA error:', error.message);
+    else console.error('OpenAI QA unknown error:', error);
     return "I'm experiencing technical difficulties. Please try again later.";
   }
 }
 
-// Enhanced function to answer questions using web scraping
+/**
+ * Answer a question with optional reference to the original URL.
+ * Returns both answer text and any sources (URLs) the model mentions or the provided articleUrl.
+ */
 export async function answerQuestionAboutArticleWithWebScraping(
   question: string,
   articleContent: string,
   articleUrl?: string
-): Promise<{
-    answer: string;
-    sources: string[];
-  }> {
+): Promise<{ answer: string; sources: string[] }> {
   try {
-    let systemMessage = "You are an AI assistant that answers questions about news articles. Base your answers primarily on the information provided in the article. If the information is not in the article, say so. Be comprehensive and provide detailed answers when possible.";
-    
+    let system = 'You are an AI assistant that answers questions about news articles. Base answers primarily on the provided article content. If the required information is not in the article, say so. Be comprehensive when possible.';
     if (articleUrl) {
-      systemMessage += ` The user has also provided the original article URL: ${articleUrl}. You can mention this as a source of information if relevant.`;
+      system += ` The original article URL: ${articleUrl}. You may refer to it when citing sources.`;
     }
-    
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo", // Using a more capable model for better web-aware responses
+      model: OPENAI_MODEL,
       messages: [
-        {
-          role: "system",
-          content: systemMessage
-        },
-        {
-          role: "user",
-          content: `Article content:\n${articleContent}\n\nQuestion: ${question}`
-        }
+        { role: 'system', content: system },
+        { role: 'user', content: `Article content:\n${articleContent}\n\nQuestion: ${question}` },
       ],
       max_tokens: 1000,
-      temperature: 0.3,
+      temperature: 0.2,
     });
-    
-    const answer = response.choices[0]?.message?.content || "I couldn't answer that question based on the article content.";
-    
-    // Extract sources mentioned in the response
+
+    const answer = response.choices?.[0]?.message?.content ?? "I couldn't answer that question based on the article content.";
+
+    // collect sources: include articleUrl and any URLs mentioned by the model
     const sources: string[] = [];
-    if (articleUrl) {
-      sources.push(articleUrl);
+    if (articleUrl) sources.push(articleUrl);
+
+    const urlRegex = /https?:\/\/[^\s)]+/g;
+    const found = answer.match(urlRegex) ?? [];
+    for (const u of found) {
+      if (!sources.includes(u)) sources.push(u);
     }
-    
-    // Look for any URLs mentioned in the response
-    const urlRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
-    const urlsInResponse = answer.match(urlRegex);
-    if (urlsInResponse) {
-      urlsInResponse.forEach(url => {
-        if (!sources.includes(url)) {
-          sources.push(url);
-        }
-      });
-    }
-    
-    return {
-      answer,
-      sources
-    };
-  } catch (error) {
-    console.error('OpenAI article Q&A with web scraping error:', error);
-    return {
-      answer: "I'm experiencing technical difficulties. Please try again later.",
-      sources: []
-    };
+
+    return { answer, sources };
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI QA+scrape error:', error.message);
+    else console.error('OpenAI QA+scrape unknown error:', error);
+    return { answer: "I'm experiencing technical difficulties. Please try again later.", sources: [] };
   }
 }
 
-// Function to extract article content from URL (placeholder implementation)
+/* -------------------------
+   Article helpers & advanced utils
+   ------------------------- */
+
+/**
+ * (Placeholder) Extract article content from URL.
+ * Replace this with your own scraping/extractor integration.
+ */
 export async function extractArticleContentFromUrl(url: string): Promise<{
   title: string;
   content: string;
@@ -217,213 +270,170 @@ export async function extractArticleContentFromUrl(url: string): Promise<{
   publishDate?: string;
 }> {
   try {
-    // In a real implementation, you would use a web scraping service or library
-    // For this example, we'll return a placeholder response
-    
-    console.log(`Would extract content from URL: ${url}`);
-    
-    // This is where you would implement actual web scraping
-    // You could use services like:
-    // - Apify
-    // - ScrapingBee
-    // - Cheerio with a proxy service
-    // - Custom Puppeteer/Playwright implementation
-    
-    // For now, return placeholder data
+    console.log(`extractArticleContentFromUrl called for ${url}`);
+    // Placeholder implementation — swap in your extractor or third-party API
     return {
-      title: "Article title would be extracted here",
-      content: "Full article content would be extracted from the web page here. This would include the main text of the article, potentially more comprehensive than what's stored in the database.",
-      author: "Author would be extracted here",
-      publishDate: new Date().toISOString()
+      title: '',
+      content: '',
+      author: '',
+      publishDate: '',
     };
-  } catch (error) {
-    console.error('Error extracting article content from URL:', error);
-    return {
-      title: "",
-      content: "",
-    };
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('Error extracting article content:', error.message);
+    else console.error('Error extracting article content (unknown):', error);
+    return { title: '', content: '' };
   }
 }
 
+/**
+ * Explore topic: explanation, related topics, suggested questions
+ */
 export async function exploreTopic(
   topic: string,
-  userPreferences?: {
-    interests: string[];
-    country: string;
-    language: string;
-  }
-): Promise<{
-  explanation: string;
-  relatedTopics: string[];
-  suggestedQuestions: string[];
-}> {
+  userPreferences?: { interests: string[]; country: string; language: string }
+): Promise<{ explanation: string; relatedTopics: string[]; suggestedQuestions: string[] }> {
   try {
-    const preferencesText = userPreferences 
-      ? `\n\nUser preferences:\n- Interests: ${userPreferences.interests.join(', ')}\n- Country: ${userPreferences.country}\n- Language: ${userPreferences.language}`
+    const prefText = userPreferences
+      ? `User preferences:\n- Interests: ${userPreferences.interests.join(', ')}\n- Country: ${userPreferences.country}\n- Language: ${userPreferences.language}`
       : '';
-    
+
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: OPENAI_MODEL,
       messages: [
         {
-          role: "system",
-          content: `You are an AI assistant that helps users explore news topics. Provide a concise explanation of the topic, suggest related topics, and propose questions the user might want to ask.${preferencesText}`
+          role: 'system',
+          content:
+            'You are an AI assistant that helps users explore news topics. Provide a concise explanation, suggest 4-6 related topics, and 6 suggested questions the user might ask to learn more. Format clearly.',
         },
-        {
-          role: "user",
-          content: `I want to learn about: ${topic}`
-        }
+        { role: 'user', content: `Topic: ${topic}\n\n${prefText}` },
       ],
       max_tokens: 800,
-      temperature: 0.7,
+      temperature: 0.6,
     });
-    
-    const content = response.choices[0]?.message?.content || "";
-    
-    // Fixed regex patterns by replacing the 's' flag with [\s\S] pattern
-    const explanationMatch = content.match(/Explanation:([\s\S]*?)(?=Related Topics:|$)/);
-    const relatedTopicsMatch = content.match(/Related Topics:([\s\S]*?)(?=Suggested Questions:|$)/);
-    const suggestedQuestionsMatch = content.match(/Suggested Questions:([\s\S]*?)$/);
-    
-    const explanation = explanationMatch ? explanationMatch[1].trim() : content;
-    const relatedTopics = relatedTopicsMatch 
-      ? relatedTopicsMatch[1].split(',').map(t => t.trim()).filter(t => t)
+
+    const text = response.choices?.[0]?.message?.content ?? '';
+
+    // Try to parse out sections heuristically
+    const explanationMatch = text.match(/Explanation:([\s\S]*?)(?=Related Topics:|Suggested Questions:|$)/i);
+    const relatedMatch = text.match(/Related Topics:([\s\S]*?)(?=Suggested Questions:|$)/i);
+    const suggestedMatch = text.match(/Suggested Questions:([\s\S]*?)$/i);
+
+    const explanation = explanationMatch ? explanationMatch[1].trim() : text.trim();
+    const relatedTopics = relatedMatch
+      ? relatedMatch[1].split(/,|\n/).map((s) => s.replace(/^-?\s*/, '').trim()).filter(Boolean)
       : [];
-    const suggestedQuestions = suggestedQuestionsMatch 
-      ? suggestedQuestionsMatch[1].split('\n').map(q => q.replace(/^-\s*/, '').trim()).filter(q => q)
+    const suggestedQuestions = suggestedMatch
+      ? suggestedMatch[1].split(/\n/).map((s) => s.replace(/^-?\s*/, '').trim()).filter(Boolean)
       : [];
-    
-    return {
-      explanation,
-      relatedTopics,
-      suggestedQuestions
-    };
-  } catch (error) {
-    console.error('OpenAI topic exploration error:', error);
+
+    return { explanation, relatedTopics, suggestedQuestions };
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI exploreTopic error:', error.message);
+    else console.error('OpenAI exploreTopic unknown error:', error);
     return {
       explanation: "I'm experiencing technical difficulties. Please try again later.",
       relatedTopics: [],
-      suggestedQuestions: []
+      suggestedQuestions: [],
     };
   }
 }
 
+/**
+ * Generate a personalized briefing based on recent articles (title + summary).
+ */
 export async function generatePersonalizedBriefing(
-  userPreferences: {
-    interests: string[];
-    country: string;
-    language: string;
-  },
-  recentArticles: {
-    title: string;
-    summary: string;
-    category: string;
-    publishedAt: string;
-  }[]
+  userPreferences: { interests: string[]; country: string; language: string },
+  recentArticles: { title: string; summary: string; category: string; publishedAt: string }[]
 ): Promise<string> {
   try {
-    // Format articles for the AI
-    const articlesText = recentArticles.map(article => 
-      `- ${article.title} (${article.category}): ${article.summary}`
-    ).join('\n');
-    
+    const prefText = `Interests: ${userPreferences.interests.join(', ')}\nCountry: ${userPreferences.country}\nLanguage: ${userPreferences.language}`;
+    const articlesText = recentArticles
+      .slice(0, 12)
+      .map((a) => `- ${a.title} (${a.category}, ${a.publishedAt}): ${a.summary}`)
+      .join('\n');
+
+    const system = 'You are NewsGenie. Create a concise personalized briefing organized by topic. Highlight the most important items. Keep it under ~500 words.';
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: OPENAI_MODEL,
       messages: [
-        {
-          role: "system",
-          content: `You are NewsGenie, an AI assistant that creates personalized news briefings. Create a concise, informative briefing for the user based on their interests and the recent articles provided. The briefing should be organized by topic and highlight the most important information. Keep it under 500 words.`
-        },
-        {
-          role: "user",
-          content: `User preferences:\n- Interests: ${userPreferences.interests.join(', ')}\n- Country: ${userPreferences.country}\n- Language: ${userPreferences.language}\n\nRecent articles:\n${articlesText}`
-        }
+        { role: 'system', content: system },
+        { role: 'user', content: `User preferences:\n${prefText}\n\nRecent articles:\n${articlesText}` },
       ],
-      max_tokens: 600,
-      temperature: 0.5,
+      max_tokens: 700,
+      temperature: 0.35,
     });
-    
-    return response.choices[0]?.message?.content || "I couldn't generate a briefing at this time.";
-  } catch (error) {
-    console.error('OpenAI briefing generation error:', error);
+
+    return response.choices?.[0]?.message?.content ?? "I couldn't generate a briefing at this time.";
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI briefing error:', error.message);
+    else console.error('OpenAI briefing unknown error:', error);
     return "I'm experiencing technical difficulties. Please try again later.";
   }
 }
 
-// Function to analyze article sentiment with more detail
+/* -------------------------
+   Other utilities
+   ------------------------- */
+
+/**
+ * A more detailed sentiment analysis that returns JSON-like structure.
+ */
 export async function detailedSentimentAnalysis(text: string): Promise<{
   sentiment: 'positive' | 'negative' | 'neutral';
   confidence: number;
   explanation: string;
 }> {
   try {
+    const system = 'Analyze the sentiment and respond ONLY with a JSON object: { "sentiment": "positive|negative|neutral", "confidence": number (0-1), "explanation": "short explanation" }';
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "Analyze the sentiment of the given text. Respond with a JSON object containing: 1) sentiment (positive, negative, or neutral), 2) confidence (a number between 0 and 1), and 3) a brief explanation of your analysis."
-        },
-        {
-          role: "user",
-          content: text
-        }
-      ],
-      max_tokens: 150,
-      temperature: 0.3,
-      response_format: { type: "json_object" }
+      model: OPENAI_MODEL,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: text }],
+      max_tokens: 160,
+      temperature: 0.2,
     });
-    
-    const content = response.choices[0]?.message?.content || '{"sentiment": "neutral", "confidence": 0.5, "explanation": "Unable to analyze sentiment."}';
-    
+
+    const content = response.choices?.[0]?.message?.content ?? '';
+    // Try strict JSON parse, otherwise try to extract JSON substring
     try {
-      const parsed = JSON.parse(content);
-      return {
-        sentiment: parsed.sentiment || 'neutral',
-        confidence: parsed.confidence || 0.5,
-        explanation: parsed.explanation || "No explanation provided."
-      };
-    } catch (parseError) {
-      console.error('Error parsing sentiment analysis response:', parseError);
-      return {
-        sentiment: 'neutral',
-        confidence: 0.5,
-        explanation: "Error analyzing sentiment."
-      };
+      return JSON.parse(content);
+    } catch {
+      const m = content.match(/\{[\s\S]*\}/);
+      if (m) {
+        try {
+          return JSON.parse(m[0]);
+        } catch {
+          // fall through to default
+        }
+      }
+      return { sentiment: 'neutral', confidence: 0.5, explanation: 'Unable to parse model output.' };
     }
-  } catch (error) {
-    console.error('OpenAI detailed sentiment analysis error:', error);
-    return {
-      sentiment: 'neutral',
-      confidence: 0.5,
-      explanation: "Error analyzing sentiment."
-    };
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI detailed sentiment error:', error.message);
+    else console.error('OpenAI detailed sentiment unknown error:', error);
+    return { sentiment: 'neutral', confidence: 0.5, explanation: 'Error analyzing sentiment.' };
   }
 }
 
-// Function to generate article tags/categories
+/**
+ * Generate 5-10 tags for an article as an array.
+ */
 export async function generateArticleTags(title: string, content: string): Promise<string[]> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: OPENAI_MODEL,
       messages: [
-        {
-          role: "system",
-          content: "Generate 5-10 relevant tags or categories for the given article. Return them as a comma-separated list."
-        },
-        {
-          role: "user",
-          content: `Title: ${title}\n\nContent: ${content}`
-        }
+        { role: 'system', content: 'Generate 5-10 concise tags for the article. Return a comma-separated list.' },
+        { role: 'user', content: `Title: ${title}\n\nContent: ${content}` },
       ],
-      max_tokens: 50,
-      temperature: 0.3,
+      max_tokens: 80,
+      temperature: 0.25,
     });
-    
-    const tags = response.choices[0]?.message?.content || "";
-    return tags ? tags.split(',').map(tag => tag.trim()) : [];
-  } catch (error) {
-    console.error('OpenAI tag generation error:', error);
+
+    const out = response.choices?.[0]?.message?.content ?? '';
+    return out.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 10);
+  } catch (error: unknown) {
+    if (error instanceof Error) console.error('OpenAI tag generation error:', error.message);
+    else console.error('OpenAI tag generation unknown error:', error);
     return [];
   }
 }
