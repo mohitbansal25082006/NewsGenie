@@ -7,6 +7,14 @@ import { summarizeArticle, analyzeSentiment, extractKeywords } from '@/lib/opena
 
 const newsApi = new NewsAPI();
 
+interface NewsApiParams {
+  page: number;
+  pageSize: number;
+  country: string;
+  category?: string;
+  q?: string;
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -27,7 +35,7 @@ export async function GET(request: Request) {
       include: { userPreference: true },
     });
 
-    let newsParams: any = {
+    const newsParams: NewsApiParams = {
       page,
       pageSize,
       country,

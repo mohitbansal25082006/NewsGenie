@@ -67,15 +67,6 @@ export default function PreferencesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Redirect if not authenticated
-  if (status === 'loading') {
-    return <div>Loading...</div>;
-  }
-
-  if (status === 'unauthenticated') {
-    redirect('/');
-  }
-
   // Fetch preferences
   const fetchPreferences = async () => {
     setLoading(true);
@@ -135,6 +126,15 @@ export default function PreferencesPage() {
     }
   }, [session]);
 
+  // Redirect if not authenticated
+  if (status === 'loading') {
+    return <div>Loading...</div>;
+  }
+
+  if (status === 'unauthenticated') {
+    redirect('/');
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -179,7 +179,7 @@ export default function PreferencesPage() {
           <CardHeader>
             <CardTitle>News Categories</CardTitle>
             <CardDescription>
-              Select the categories you're interested in
+              Select the categories you&apos;re interested in
             </CardDescription>
           </CardHeader>
           <CardContent>

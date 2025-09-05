@@ -1,10 +1,10 @@
-import { NextAuthOptions } from "next-auth"
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
-import GoogleProvider from "next-auth/providers/google"
-import GitHubProvider from "next-auth/providers/github"
-import { prisma } from "./db"
-import type { Session } from "next-auth"
-import type { JWT } from "next-auth/jwt"
+import { NextAuthOptions } from "next-auth";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
+import { prisma } from "./db";
+import type { Session, User } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -20,16 +20,21 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     session: ({ session, token }: { session: Session; token: JWT }) => {
+      // token.sub is the user's id (string) when set in the jwt callback
       if (token.sub) {
-        session.user.id = token.sub
+        // session.user may not have an `id` property by default in the Session type,
+        // so we assert a minimal shape to add the id without using `any`.
+        (session.user as { id?: string }).id = token.sub;
       }
-      return session
+      return session;
     },
-    jwt: ({ token, user }: { token: JWT; user?: any }) => {
+    jwt: ({ token, user }: { token: JWT; user?: User }) => {
+      // When a user is present (on sign in), attach their id to the token.
+      // Use String(...) to be safe in case user.id is not a string.
       if (user) {
-        token.sub = user.id
+        token.sub = String((user as { id?: unknown }).id ?? token.sub ?? "");
       }
-      return token
+      return token;
     },
   },
   pages: {
@@ -40,4 +45,4 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   secret: process.env.NEXTAUTH_SECRET,
-}
+};

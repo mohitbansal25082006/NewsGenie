@@ -1,8 +1,7 @@
 'use client';
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { redirect, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { Search, BookmarkPlus, BookmarkCheck, ExternalLink, TrendingUp, Calendar, Heart, Eye, Settings, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import Image from 'next/image';
 import toast, { Toaster } from 'react-hot-toast';
 
 interface Article {
@@ -30,6 +29,14 @@ interface Article {
   summary?: string;
   sentiment?: string;
   keywords?: string[];
+}
+
+interface Bookmark {
+  id: string;
+  userId: string;
+  articleId: string;
+  createdAt: string;
+  article: Article;
 }
 
 interface Analytics {
@@ -50,6 +57,7 @@ const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
@@ -61,37 +69,25 @@ export default function DashboardPage() {
   const [searching, setSearching] = useState(false);
 
   // Redirect if not authenticated
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'unauthenticated') {
-    redirect('/');
-  }
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      redirect('/');
+    }
+  }, [status]);
 
   // Fetch news articles
-  const fetchNews = async (selectedCategory = category, query = '') => {
+  const fetchNews = useCallback(async (selectedCategory = category, query = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         category: selectedCategory,
         pageSize: '20',
       });
-
       if (query) {
         params.append('q', query);
       }
-
       const response = await fetch(`/api/news?${params.toString()}`);
       const data = await response.json();
-
       if (response.ok) {
         if (query) {
           setSearchResults(data.articles || []);
@@ -109,15 +105,14 @@ export default function DashboardPage() {
       setLoading(false);
       setSearching(false);
     }
-  };
+  }, [category]);
 
   // Fetch analytics
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     setAnalyticsLoading(true);
     try {
       const response = await fetch('/api/analytics');
       const data = await response.json();
-
       if (response.ok) {
         setAnalytics(data);
       } else {
@@ -130,23 +125,22 @@ export default function DashboardPage() {
     } finally {
       setAnalyticsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch bookmarks
-  const fetchBookmarks = async () => {
+  const fetchBookmarks = useCallback(async () => {
     try {
       const response = await fetch('/api/bookmarks');
       const data = await response.json();
-
       if (response.ok) {
-        setBookmarks(data.map((b: any) => b.articleId));
+        setBookmarks(data.map((b: Bookmark) => b.articleId));
       } else {
         console.error('Bookmarks fetch error:', data);
       }
     } catch (error) {
       console.error('Error fetching bookmarks:', error);
     }
-  };
+  }, []);
 
   // Toggle bookmark
   const toggleBookmark = async (articleId: string) => {
@@ -157,7 +151,6 @@ export default function DashboardPage() {
         const response = await fetch(`/api/bookmarks?articleId=${articleId}`, {
           method: 'DELETE',
         });
-
         if (response.ok) {
           setBookmarks(prev => prev.filter(id => id !== articleId));
           toast.success('Bookmark removed');
@@ -173,7 +166,6 @@ export default function DashboardPage() {
           },
           body: JSON.stringify({ articleId }),
         });
-
         if (response.ok) {
           setBookmarks(prev => [...prev, articleId]);
           toast.success('Article bookmarked');
@@ -210,7 +202,6 @@ export default function DashboardPage() {
       toast.error('Please enter a search term');
       return;
     }
-
     setSearching(true);
     await fetchNews(category, searchQuery);
   };
@@ -236,7 +227,7 @@ export default function DashboardPage() {
       fetchAnalytics();
       fetchBookmarks();
     }
-  }, [session]);
+  }, [session, fetchNews, fetchAnalytics, fetchBookmarks]);
 
   // Article Card Component
   const ArticleCard = ({ article }: { article: Article }) => {
@@ -248,15 +239,18 @@ export default function DashboardPage() {
           <div className="flex flex-col md:flex-row">
             {article.urlToImage && (
               <div className="md:w-1/3">
-                <img 
-                  src={article.urlToImage} 
-                  alt={article.title}
-                  className="w-full h-48 md:h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-t-none"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
+                <div className="relative w-full h-48 md:h-full">
+                  <Image 
+                    src={article.urlToImage} 
+                    alt={article.title}
+                    fill
+                    className="object-cover rounded-t-lg md:rounded-l-lg md:rounded-t-none"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
               </div>
             )}
             <div className={`p-6 ${article.urlToImage ? 'md:w-2/3' : 'w-full'}`}>
@@ -417,19 +411,15 @@ export default function DashboardPage() {
         </div>
       );
     }
-
     if (!analytics) return null;
-
     const categoryData = Object.entries(analytics.categoryDistribution).map(([key, value]) => ({
       name: key.charAt(0).toUpperCase() + key.slice(1),
       value,
     }));
-
     const sentimentData = Object.entries(analytics.sentimentDistribution).map(([key, value]) => ({
       name: key.charAt(0).toUpperCase() + key.slice(1),
       value,
     }));
-
     return (
       <div className="space-y-6">
         {/* Stats Cards */}
@@ -474,7 +464,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {analytics.readingStats.length > 0 && (
@@ -559,7 +548,6 @@ export default function DashboardPage() {
             </Card>
           )}
         </div>
-
         {/* Empty State for Analytics */}
         {analytics.totalRead === 0 && (
           <Card>
@@ -577,6 +565,17 @@ export default function DashboardPage() {
       </div>
     );
   };
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -606,7 +605,6 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
-
         <Tabs defaultValue="news" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="news" className="flex items-center space-x-2">
@@ -618,7 +616,6 @@ export default function DashboardPage() {
               <span>Analytics</span>
             </TabsTrigger>
           </TabsList>
-
           <TabsContent value="news" className="space-y-6">
             {/* Controls */}
             <Card>
@@ -663,13 +660,12 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Search Results */}
             {searchQuery && (
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold">
-                    Search Results for "{searchQuery}"
+                    Search Results for &ldquo;{searchQuery}&rdquo;
                   </h2>
                   <Badge variant="secondary">
                     {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
@@ -688,13 +684,12 @@ export default function DashboardPage() {
                   <Alert>
                     <Search className="h-4 w-4" />
                     <AlertDescription>
-                      No articles found for "{searchQuery}". Try different keywords or browse by category.
+                      No articles found for &ldquo;{searchQuery}&rdquo;. Try different keywords or browse by category.
                     </AlertDescription>
                   </Alert>
                 )}
               </div>
             )}
-
             {/* News Feed */}
             {!searchQuery && (
               <div>
@@ -725,7 +720,6 @@ export default function DashboardPage() {
               </div>
             )}
           </TabsContent>
-
           <TabsContent value="analytics" className="space-y-6">
             <div>
               <h2 className="text-xl font-semibold mb-4">Your Reading Analytics</h2>

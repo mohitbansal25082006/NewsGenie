@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,17 +34,10 @@ interface BookmarkedArticle {
 
 export default function BookmarksPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
+
   const [bookmarks, setBookmarks] = useState<BookmarkedArticle[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Redirect if not authenticated
-  if (status === 'loading') {
-    return <div>Loading...</div>;
-  }
-
-  if (status === 'unauthenticated') {
-    redirect('/');
-  }
 
   // Fetch bookmarks
   const fetchBookmarks = async () => {
@@ -56,8 +50,11 @@ export default function BookmarksPage() {
         setBookmarks(data);
       } else {
         toast.error('Failed to fetch bookmarks');
+        console.error('Fetch bookmarks failed', data);
       }
     } catch (error) {
+      // use the error variable so eslint doesn't complain
+      console.error('Error fetching bookmarks', error);
       toast.error('Error fetching bookmarks');
     } finally {
       setLoading(false);
@@ -75,32 +72,49 @@ export default function BookmarksPage() {
         setBookmarks(prev => prev.filter(b => b.article.id !== articleId));
         toast.success('Bookmark removed');
       } else {
+        const body = await response.text();
+        console.error('Failed to remove bookmark', body);
         toast.error('Failed to remove bookmark');
       }
     } catch (error) {
+      console.error('Error removing bookmark', error);
       toast.error('Error removing bookmark');
     }
   };
 
+  // Run effects after hooks (do redirect client-side and fetch bookmarks)
   useEffect(() => {
+    if (status === 'loading') return;
+
+    if (status === 'unauthenticated') {
+      // client-side redirect
+      router.replace('/');
+      return;
+    }
+
+    // only fetch when session is available / authenticated
     if (session) {
       fetchBookmarks();
     }
-  }, [session]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, session]);
 
   // Bookmark Card Component
   const BookmarkCard = ({ bookmark }: { bookmark: BookmarkedArticle }) => {
     const { article } = bookmark;
-    
+
     return (
       <Card className="mb-4 hover:shadow-lg transition-shadow">
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row">
             {article.urlToImage && (
-              <div className="md:w-1/3">
-                <img 
-                  src={article.urlToImage} 
+              <div className="md:w-1/3 relative w-full h-48 md:h-auto">
+                {/* next/image for better LCP — using fixed dimensions for simplicity */}
+                <Image
+                  src={article.urlToImage}
                   alt={article.title}
+                  width={800}
+                  height={500}
                   className="w-full h-48 md:h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-t-none"
                 />
               </div>
@@ -110,7 +124,7 @@ export default function BookmarksPage() {
                 <div className="flex items-center gap-2 mb-2">
                   <Badge variant="secondary">{article.source}</Badge>
                   {article.sentiment && (
-                    <Badge 
+                    <Badge
                       variant={
                         article.sentiment === 'positive' ? 'default' :
                         article.sentiment === 'negative' ? 'destructive' : 'secondary'
@@ -133,15 +147,15 @@ export default function BookmarksPage() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               <h3 className="text-lg font-semibold mb-2 line-clamp-2">
                 {article.title}
               </h3>
-              
+
               <p className="text-gray-600 mb-3 line-clamp-2">
                 {article.description}
               </p>
-              
+
               {article.summary && (
                 <div className="bg-blue-50 p-3 rounded-md mb-3">
                   <p className="text-sm text-blue-800">
@@ -149,7 +163,7 @@ export default function BookmarksPage() {
                   </p>
                 </div>
               )}
-              
+
               {article.keywords && article.keywords.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
                   {article.keywords.slice(0, 3).map((keyword, index) => (
@@ -159,7 +173,7 @@ export default function BookmarksPage() {
                   ))}
                 </div>
               )}
-              
+
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
@@ -171,15 +185,15 @@ export default function BookmarksPage() {
                     </>
                   )}
                 </div>
-                
+
                 <Button
                   variant="ghost"
                   size="sm"
                   asChild
                 >
-                  <a 
-                    href={article.url} 
-                    target="_blank" 
+                  <a
+                    href={article.url}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1"
                   >
@@ -194,10 +208,19 @@ export default function BookmarksPage() {
     );
   };
 
+  // Render
+  if (status === 'loading') {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <Toaster position="top-right" />
-      
+
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Link href="/dashboard">
@@ -241,7 +264,7 @@ export default function BookmarksPage() {
       ) : (
         <Alert>
           <AlertDescription>
-            You haven't bookmarked any articles yet. Start exploring news and bookmark articles you'd like to read later!
+            You haven&apos;t bookmarked any articles yet. Start exploring news and bookmark articles you&apos;d like to read later!
           </AlertDescription>
         </Alert>
       )}
