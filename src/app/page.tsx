@@ -1,10 +1,9 @@
+// E:\newsgenie\src\app\page.tsx
 'use client';
 
-import { useSession, signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   BookOpen, 
   Brain, 
@@ -21,67 +20,25 @@ import {
   Chrome
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSession, signIn } from 'next-auth/react';
+import { toast } from 'sonner';
 
 export default function HomePage() {
-  const { data: session, status } = useSession();
-
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const { data: session } = useSession();
+  
+  const handleSignIn = async (provider: string) => {
+    try {
+      await signIn(provider, { callbackUrl: "/dashboard" });
+      toast.success("Signing you in...");
+    } catch (error) {
+      toast.error("Failed to sign in. Please try again.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      {/* Navigation Header */}
-      <nav className="border-b bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-lg">
-              <Newspaper className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              NewsGenie
-            </span>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            {session ? (
-              <>
-                <Link href="/dashboard">
-                  <Button>
-                    Dashboard <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </Link>
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={session.user?.image || ''} />
-                    <AvatarFallback>
-                      {session.user?.name?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-              </>
-            ) : (
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => signIn('google')}
-                  className="flex items-center space-x-2"
-                >
-                  <Chrome className="h-4 w-4" />
-                  <span>Sign in</span>
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
-      <section className="py-20 md:py-32">
+      <section className="py-12 md:py-20">
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-4xl mx-auto">
             <Badge variant="secondary" className="mb-4">
@@ -101,14 +58,14 @@ export default function HomePage() {
               Stop scrolling through irrelevant headlines. Get AI-curated news summaries, 
               sentiment analysis, and trending insights tailored to your interests.
             </p>
-
-            <div className="mb-12">
-              {!session ? (
+            
+            {!session && (
+              <div className="mb-12">
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                   <Button 
                     size="lg"
-                    onClick={() => signIn('google')}
                     className="flex items-center space-x-2"
+                    onClick={() => handleSignIn("google")}
                   >
                     <Chrome className="h-5 w-5" />
                     <span>Continue with Google</span>
@@ -116,22 +73,29 @@ export default function HomePage() {
                   <Button 
                     size="lg"
                     variant="outline"
-                    onClick={() => signIn('github')}
                     className="flex items-center space-x-2"
+                    onClick={() => handleSignIn("github")}
                   >
                     <Github className="h-5 w-5" />
                     <span>Continue with GitHub</span>
                   </Button>
                 </div>
-              ) : (
-                <Link href="/dashboard">
-                  <Button size="lg" className="text-lg px-8">
-                    Go to Dashboard <ArrowRight className="h-5 w-5 ml-2" />
+              </div>
+            )}
+            
+            {session && (
+              <div className="mb-12">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <Button asChild size="lg">
+                    <Link href="/dashboard">Go to Dashboard</Link>
                   </Button>
-                </Link>
-              )}
-            </div>
-
+                  <Button variant="outline" size="lg" asChild>
+                    <Link href="/chat">Try AI Chat</Link>
+                  </Button>
+                </div>
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto text-sm text-slate-500 dark:text-slate-400">
               <div className="flex items-center justify-center gap-2">
                 <Shield className="h-4 w-4 text-green-500" />
@@ -149,7 +113,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+      
       {/* Features Section */}
       <section id="features" className="py-20 bg-white dark:bg-slate-900">
         <div className="container mx-auto px-4">
@@ -161,7 +125,6 @@ export default function HomePage() {
               Experience news consumption reimagined with cutting-edge AI technology
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <CardHeader>
@@ -181,7 +144,6 @@ export default function HomePage() {
                 </ul>
               </CardContent>
             </Card>
-
             <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <CardHeader>
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -200,7 +162,6 @@ export default function HomePage() {
                 </ul>
               </CardContent>
             </Card>
-
             <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <CardHeader>
                 <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -219,7 +180,6 @@ export default function HomePage() {
                 </ul>
               </CardContent>
             </Card>
-
             <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <CardHeader>
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -238,7 +198,6 @@ export default function HomePage() {
                 </ul>
               </CardContent>
             </Card>
-
             <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <CardHeader>
                 <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -257,7 +216,6 @@ export default function HomePage() {
                 </ul>
               </CardContent>
             </Card>
-
             <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <CardHeader>
                 <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -279,7 +237,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+      
       {/* How It Works Section */}
       <section id="how-it-works" className="py-20">
         <div className="container mx-auto px-4">
@@ -291,7 +249,6 @@ export default function HomePage() {
               Three simple steps to transform your news consumption experience
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <div className="text-center group">
               <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
@@ -303,7 +260,6 @@ export default function HomePage() {
                 to create a personalized news experience.
               </p>
             </div>
-
             <div className="text-center group">
               <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
                 <span className="text-2xl font-bold text-white">2</span>
@@ -314,7 +270,6 @@ export default function HomePage() {
                 analyzing sentiment, and identifying trending topics.
               </p>
             </div>
-
             <div className="text-center group">
               <div className="w-20 h-20 bg-gradient-to-r from-pink-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
                 <span className="text-2xl font-bold text-white">3</span>
@@ -328,53 +283,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* CTA Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to Transform Your News Experience?
-            </h2>
-            <p className="text-xl text-slate-600 dark:text-slate-300 mb-8">
-              Join thousands of users who already enjoy personalized, AI-curated news
-            </p>
-            
-            {!session ? (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <Button 
-                  size="lg"
-                  onClick={() => signIn('google')}
-                  className="flex items-center space-x-2"
-                >
-                  <Chrome className="h-5 w-5" />
-                  <span>Continue with Google</span>
-                </Button>
-                <Button 
-                  size="lg"
-                  variant="outline"
-                  onClick={() => signIn('github')}
-                  className="flex items-center space-x-2"
-                >
-                  <Github className="h-5 w-5" />
-                  <span>Continue with GitHub</span>
-                </Button>
-              </div>
-            ) : (
-              <Link href="/dashboard">
-                <Button size="lg" className="text-lg px-8">
-                  Go to Dashboard <ArrowRight className="h-5 w-5 ml-2" />
-                </Button>
-              </Link>
-            )}
-            
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
-              No credit card required • Free forever plan available
-            </p>
-          </div>
-        </div>
-      </section>
-
+      
       {/* Footer */}
       <footer className="border-t bg-white dark:bg-slate-950">
         <div className="container mx-auto px-4 py-12">
