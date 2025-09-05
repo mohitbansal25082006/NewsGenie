@@ -1,7 +1,6 @@
 // E:\newsgenie\src\components\ui\user-menu.tsx
 "use client";
-
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut, signIn } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,20 +10,46 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, Bell, MessageSquare } from "lucide-react";
+import { User, Settings, LogOut, Bell, MessageSquare, Github, Chrome } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 export function UserMenu() {
   const { data: session } = useSession();
-
+  
+  const handleSignIn = async (provider: string) => {
+    try {
+      await signIn(provider, { callbackUrl: "/dashboard" });
+      toast.success("Signing you in...");
+    } catch (error) {
+      toast.error("Failed to sign in. Please try again.");
+    }
+  };
+  
   if (!session) {
     return (
-      <Link href="/auth/signin">
-        <Button variant="ghost">Sign In</Button>
-      </Link>
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleSignIn("google")}
+          className="flex items-center gap-2"
+        >
+          <Chrome className="h-4 w-4" />
+          Google
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => handleSignIn("github")}
+          className="flex items-center gap-2"
+        >
+          <Github className="h-4 w-4" />
+          GitHub
+        </Button>
+      </div>
     );
   }
-
+  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

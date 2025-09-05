@@ -5,8 +5,10 @@ import "./globals.css"
 import { Providers } from "@/components/providers"
 import Link from "next/link"
 import { NotificationBadge } from "@/components/ui/notification-badge"
-import { UserMenu } from "@/components/ui/user-menu"
+import { UserMenu } from "@/components/ui/user-menu" // Fixed import
+
 const inter = Inter({ subsets: ["latin"] })
+
 export const metadata: Metadata = {
   title: "NewsGenie - AI-Powered News Aggregator",
   description:
@@ -19,6 +21,7 @@ export const metadata: Metadata = {
     type: "website",
   },
 }
+
 export default function RootLayout({
   children,
 }: {
