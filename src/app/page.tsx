@@ -28,12 +28,21 @@ import {
   Clock,
   Award,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Bell,
+  Smartphone,
+  Settings,
+  Filter,
+  Volume2,
+  VolumeX,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSession, signIn } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useState } from 'react';
+
 export default function HomePage() {
   const { data: session } = useSession();
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
@@ -46,9 +55,11 @@ export default function HomePage() {
       toast.error("Failed to sign in. Please try again.");
     }
   };
+  
   const toggleFaq = (index: number) => {
     setExpandedFaq(expandedFaq === index ? null : index);
   };
+  
   const testimonials = [
     {
       name: "Sarah Johnson",
@@ -69,6 +80,7 @@ export default function HomePage() {
       rating: 4
     }
   ];
+  
   const faqs = [
     {
       question: "How does NewsGenie curate news?",
@@ -87,6 +99,7 @@ export default function HomePage() {
       answer: "Our sentiment analysis has over 92% accuracy and continuously improves through machine learning."
     }
   ];
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
       {/* Hero Section */}
@@ -287,6 +300,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      
       {/* AI Chat & Insights Section */}
       <section className="py-20 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800">
         <div className="container mx-auto px-4">
@@ -378,6 +392,157 @@ export default function HomePage() {
                   <Button size="sm" disabled>
                     <ArrowRight className="h-4 w-4" />
                   </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      {/* Real-time Notifications Section */}
+      <section className="py-20 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-slate-800 dark:to-slate-900">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <Badge variant="secondary" className="mb-4 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+              <Bell className="h-3 w-3 mr-1" />
+              Real-time Notifications
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Stay Updated Instantly
+            </h2>
+            <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
+              Never miss important news with our intelligent notification system
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold">Notification Center</h3>
+                <div className="flex items-center space-x-2">
+                  <Button size="sm" variant="ghost">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost">
+                    <Filter className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-start p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="bg-blue-500 p-2 rounded-full mr-3">
+                    <Bell className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-medium">Breaking News</h4>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">2 min ago</span>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                      Major tech company announces revolutionary AI breakthrough
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="bg-green-500 p-2 rounded-full mr-3">
+                    <TrendingUp className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-medium">Trending Topic</h4>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">15 min ago</span>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                      Climate summit reaches historic agreement on emissions
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <div className="bg-purple-500 p-2 rounded-full mr-3">
+                    <BookOpen className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-medium">Personalized Digest</h4>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">1 hour ago</span>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                      Your daily tech news digest is ready with 5 new articles
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Button size="sm" variant="ghost">
+                    <Volume2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost">
+                    <VolumeX className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost">
+                    <EyeOff className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button size="sm">
+                  View All
+                </Button>
+              </div>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="flex items-start space-x-4">
+                <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
+                  <Bell className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Smart Alerts</h3>
+                  <p className="text-slate-600 dark:text-slate-300">
+                    Get notified about breaking news and trending topics that match your interests, with intelligent filtering to reduce noise.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-4">
+                <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
+                  <Smartphone className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Cross-Platform Sync</h3>
+                  <p className="text-slate-600 dark:text-slate-300">
+                    Receive notifications on all your devices with seamless synchronization. Never miss important updates wherever you are.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-4">
+                <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
+                  <Settings className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Custom Preferences</h3>
+                  <p className="text-slate-600 dark:text-slate-300">
+                    Fine-tune your notification settings with granular controls. Choose what, when, and how you want to be notified.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-4">
+                <div className="bg-amber-100 dark:bg-amber-900 p-3 rounded-lg">
+                  <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Digest Mode</h3>
+                  <p className="text-slate-600 dark:text-slate-300">
+                    Opt for daily or weekly digests to receive curated summaries instead of individual notifications for less distraction.
+                  </p>
                 </div>
               </div>
             </div>
@@ -482,6 +647,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      
       {/* FAQ Section */}
       <section className="py-20 bg-slate-50 dark:bg-slate-900/50">
         <div className="container mx-auto px-4">
