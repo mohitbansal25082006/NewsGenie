@@ -7,14 +7,19 @@ type Params = { id: string };
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Params }
+  context: { params: Promise<Params> } // params may be a Promise in Next App Router
 ) {
   try {
-    const resolvedParams = params;
+    // MUST await params before using its properties
+    const { id } = await context.params;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing article id' }, { status: 400 });
+    }
 
     // Fetch current article
     const currentArticle = await db.article.findUnique({
-      where: { id: resolvedParams.id },
+      where: { id },
     });
 
     if (!currentArticle) {
@@ -25,7 +30,8 @@ export async function GET(
     const url = new URL(request.url);
     const searchParams = url.searchParams;
     const limitRaw = parseInt(searchParams.get('limit') || '5', 10);
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 5;
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 5;
     const strategy = (searchParams.get('strategy') || 'combined') as
       | 'category'
       | 'keywords'
@@ -64,7 +70,6 @@ export async function GET(
       const keywordMatches = await db.article.findMany({
         where: {
           id: { not: currentArticle.id },
-          // Prisma `hasSome` expects an array; compare against some keywords (limit to 2 for performance)
           keywords: {
             hasSome: currentKeywords.slice(0, 2),
           },
@@ -136,7 +141,7 @@ export async function GET(
       if (article.country === currentArticle.country) score += 1;
 
       // recency boost (article.publishedAt may be string or Date)
-      const published = new Date(article.publishedAt);
+      const published = new Date(article.publishedAt as unknown as string);
       const daysDiff =
         Math.abs(Date.now() - published.getTime()) / (1000 * 60 * 60 * 24);
       const recencyBoost = Math.max(0, 1 - daysDiff / 30);
@@ -158,8 +163,12 @@ export async function GET(
       strategy,
       total: finalArticles.length,
     });
-  } catch (error) {
-    console.error('Error fetching related articles:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error fetching related articles:', error.message);
+    } else {
+      console.error('Error fetching related articles (unknown):', error);
+    }
     return NextResponse.json(
       { error: 'Failed to fetch related articles' },
       { status: 500 }
