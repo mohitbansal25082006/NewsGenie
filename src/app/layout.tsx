@@ -39,9 +39,9 @@ export default async function RootLayout({
           <header className="w-full border-b bg-white shadow-sm sticky top-0 z-50">
             <nav className="container mx-auto flex items-center justify-between p-4">
               {/* Logo / Brand */}
-              <Link href="/" className="text-xl font-bold text-blue-600">
+              <div className="text-xl font-bold text-blue-600">
                 NewsGenie
-              </Link>
+              </div>
               
               {/* Nav Links */}
               <div className="flex gap-6">
