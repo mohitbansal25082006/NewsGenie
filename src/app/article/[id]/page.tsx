@@ -1,4 +1,3 @@
-// E:\newsgenie\src\app\article\[id]\page.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
@@ -123,19 +122,6 @@ export default function ArticlePage() {
         // Check if content is truncated
         if (data.content.includes('[+')) {
           setIsContentTruncated(true);
-          // Try to fetch full content
-          try {
-            const fullResponse = await fetch(`/api/article/${articleId}/fetch-full`, {
-              method: 'POST',
-            });
-            if (fullResponse.ok) {
-              const fullData: Article = await fullResponse.json();
-              setArticle(fullData);
-              setIsContentTruncated(false);
-            }
-          } catch (error) {
-            console.error('Error fetching full article:', error);
-          }
         } else {
           setIsContentTruncated(false);
         }
@@ -354,6 +340,11 @@ export default function ArticlePage() {
           sources
         };
         setQaMessages(prev => [...prev, assistantMessage]);
+        
+        // If the article was updated with full content, refresh the article state
+        if (isContentTruncated && sources && sources.includes(article?.url)) {
+          fetchArticle();
+        }
       } else {
         toast.error('Failed to get answer');
       }
@@ -759,6 +750,11 @@ export default function ArticlePage() {
               </CardTitle>
               <CardDescription>
                 Ask questions about this article. AI will analyze the original article to provide answers.
+                {isContentTruncated && (
+                  <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                    The article content appears to be truncated. When you ask a question, we'll automatically fetch the full content from the source for a more complete answer.
+                  </div>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

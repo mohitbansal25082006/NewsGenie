@@ -1,9 +1,8 @@
-// E:\newsgenie\src\app\api\article\qa\route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { answerQuestionAboutArticleWithWebScraping } from '@/lib/openai';
+import { answerQuestionAboutArticleWithWebScraping, extractArticleContentFromUrl } from '@/lib/openai';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,18 +31,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare content for analysis
-    const content = article.content || article.description || article.title || '';
+    let content = article.content || article.description || article.title || '';
     const sources: string[] = [];
 
     // If we have a URL, try to fetch more content
     if (url) {
       try {
+        // Check if the article content is truncated
+        const isTruncated = content.includes('[+');
+        
+        if (isTruncated) {
+          // Try to extract full content from URL
+          const extractedContent = await extractArticleContentFromUrl(url);
+          if (extractedContent.content) {
+            content = extractedContent.content;
+            // Update the article in the database with full content
+            await db.article.update({
+              where: { id: articleId },
+              data: {
+                content: extractedContent.content,
+                author: extractedContent.author || article.author,
+                publishedAt: extractedContent.publishDate ? new Date(extractedContent.publishDate) : article.publishedAt,
+              },
+            });
+          }
+        }
+        
         // Add the URL as a source
         sources.push(url);
-
-        // In a real implementation, you would fetch and parse the article content
-        // For now, we'll just use the existing content
-        console.log(`Would fetch content from: ${url} for Q&A`);
       } catch (error) {
         console.error('Error fetching article content for Q&A:', error);
         // Continue with existing content
