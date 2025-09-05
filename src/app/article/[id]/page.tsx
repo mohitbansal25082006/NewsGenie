@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, BookmarkPlus, BookmarkCheck, ExternalLink, Share, Clock, User, Calendar, Send, Bot, MessageSquare } from 'lucide-react';
+import { ArrowLeft, BookmarkPlus, BookmarkCheck, ExternalLink, Share, Clock, User, Calendar, Send, Bot, MessageSquare, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -44,6 +44,7 @@ interface QAMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt: Date;
+  sources?: string[];
 }
 
 export default function ArticlePage() {
@@ -61,6 +62,7 @@ export default function ArticlePage() {
   const [question, setQuestion] = useState('');
   const [isAsking, setIsAsking] = useState(false);
   const [showQA, setShowQA] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   const fetchArticle = useCallback(async () => {
     setLoading(true);
@@ -185,6 +187,39 @@ export default function ArticlePage() {
     }
   };
   
+  const analyzeArticle = async () => {
+    if (!article || isAnalyzing) return;
+    
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/api/article/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          articleId: article.id,
+          url: article.url
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Update article with new analysis data
+        setArticle(prev => prev ? { ...prev, ...data } : null);
+        toast.success('Article analysis updated');
+      } else {
+        toast.error('Failed to analyze article');
+      }
+    } catch (error) {
+      console.error('Error analyzing article:', error);
+      toast.error('Error analyzing article');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+  
   const askQuestion = async () => {
     if (!question.trim() || !session || isAsking) return;
     
@@ -202,7 +237,7 @@ export default function ArticlePage() {
     setQaMessages([...qaMessages, userMessage]);
     
     try {
-      const response = await fetch('/api/chat/article-qa', {
+      const response = await fetch('/api/article/qa', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,11 +245,12 @@ export default function ArticlePage() {
         body: JSON.stringify({
           articleId,
           question: userQuestion,
+          url: article?.url
         }),
       });
       
       if (response.ok) {
-        const { answer } = await response.json();
+        const { answer, sources } = await response.json();
         
         // Add assistant message
         const assistantMessage: QAMessage = {
@@ -222,6 +258,7 @@ export default function ArticlePage() {
           role: 'assistant',
           content: answer,
           createdAt: new Date(),
+          sources
         };
         setQaMessages(prev => [...prev, assistantMessage]);
       } else {
@@ -399,6 +436,21 @@ export default function ArticlePage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={analyzeArticle}
+            disabled={isAnalyzing}
+            className="flex items-center"
+          >
+            {isAnalyzing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Bot className="h-4 w-4 mr-2" />
+            )}
+            Analyze
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowQA(!showQA)}
             className="flex items-center"
           >
@@ -428,7 +480,7 @@ export default function ArticlePage() {
                 Ask About This Article
               </CardTitle>
               <CardDescription>
-                Ask questions about this article and get AI-powered answers
+                Ask questions about this article. AI will analyze the original article to provide answers.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -451,10 +503,23 @@ export default function ArticlePage() {
                         >
                           <div className="flex items-start space-x-2">
                             {msg.role === 'assistant' && (
-                              <Bot className="h-5 w-5 mt-0.5 text-blue-500" />
+                              <Bot className="h-5 w-5 mt-0.5 text-blue-500 flex-shrink-0" />
                             )}
                             <div>
                               <p className="whitespace-pre-wrap">{msg.content}</p>
+                              {msg.sources && msg.sources.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium mb-1">Sources:</p>
+                                  <ul className="text-xs">
+                                    {msg.sources.map((source, index) => (
+                                      <li key={index} className="flex items-center">
+                                        <span className="mr-1">•</span>
+                                        <span className="truncate">{source}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                               <div
                                 className={`text-xs mt-1 ${
                                   msg.role === 'user'
@@ -466,7 +531,7 @@ export default function ArticlePage() {
                               </div>
                             </div>
                             {msg.role === 'user' && (
-                              <User className="h-5 w-5 mt-0.5 text-blue-200" />
+                              <User className="h-5 w-5 mt-0.5 text-blue-200 flex-shrink-0" />
                             )}
                           </div>
                         </div>
@@ -490,12 +555,29 @@ export default function ArticlePage() {
                   disabled={!question.trim() || isAsking}
                 >
                   {isAsking ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
                 </Button>
               </div>
+              
+              {qaMessages.length === 0 && (
+                <div className="text-center text-sm text-gray-500 mt-2">
+                  <p>Try asking questions like:</p>
+                  <div className="flex flex-wrap justify-center gap-2 mt-1">
+                    <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setQuestion("What is the main point of this article?")}>
+                      What is the main point?
+                    </Badge>
+                    <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setQuestion("Who are the key people mentioned?")}>
+                      Who are mentioned?
+                    </Badge>
+                    <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setQuestion("What are the implications of this news?")}>
+                      What are the implications?
+                    </Badge>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { answerQuestionAboutArticleWithWebScraping } from '@/lib/openai';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,38 +37,38 @@ export async function POST(request: NextRequest) {
     // If we have a URL, try to fetch more content
     if (url) {
       try {
-        // In a real implementation, you would use a web scraping service
-        // For this example, we'll simulate fetching additional content
-        console.log(`Would fetch content from: ${url} for Q&A`);
-        
         // Add the URL as a source
         sources.push(url);
         
-        // In a real implementation, you would:
-        // 1. Fetch the HTML content from the URL
-        // 2. Extract the main article content
-        // 3. Combine it with the existing content
-        // 4. Use the combined content for Q&A
-        
+        // In a real implementation, you would fetch and parse the article content
         // For now, we'll just use the existing content
+        console.log(`Would fetch content from: ${url} for Q&A`);
       } catch (error) {
         console.error('Error fetching article content for Q&A:', error);
         // Continue with existing content
       }
     }
     
-    // Import the OpenAI function dynamically to avoid circular dependencies
-    const { answerQuestionAboutArticle } = await import('@/lib/openai');
-    
-    // Generate answer
-    const answer = await answerQuestionAboutArticle(
+    // Generate answer using the enhanced function
+    const { answer, sources: answerSources } = await answerQuestionAboutArticleWithWebScraping(
       question,
-      content
+      content,
+      url
     );
+    
+    // Combine the sources
+    const allSources = [...sources];
+    if (answerSources && answerSources.length > 0) {
+      answerSources.forEach(source => {
+        if (!allSources.includes(source)) {
+          allSources.push(source);
+        }
+      });
+    }
     
     return NextResponse.json({
       answer,
-      sources: sources.length > 0 ? sources : undefined
+      sources: allSources.length > 0 ? allSources : undefined
     });
   } catch (error) {
     console.error('Error answering article question:', error);
