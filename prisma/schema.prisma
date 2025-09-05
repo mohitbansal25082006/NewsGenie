@@ -10,13 +10,13 @@ datasource db {
 
 // ================== USER & AUTH ==================
 model User {
-  id             String          @id @default(cuid())
+  id             String           @id @default(cuid())
   name           String?
-  email          String?         @unique
+  email          String?          @unique
   emailVerified  DateTime?
   image          String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   // Relations
   accounts       Account[]
@@ -25,6 +25,7 @@ model User {
   bookmarks      Bookmark[]
   readArticles   ReadArticle[]
   readingHistory ReadingHistory[]
+  notifications  UserNotification[]
 
   @@map("users")
 }
@@ -70,22 +71,27 @@ model VerificationToken {
 
 // ================== USER PREFERENCES ==================
 model UserPreference {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Preferences
-  interests String[]
-  sources   String[]
-  language  String   @default("en")
-  country   String   @default("us")
+  interests           String[]  // Alias for categories
+  sources             String[]
+  language            String    @default("en")
+  country             String    @default("us")
+
+  // Additional fields from second schema
+  categories          String[]  // ["business", "technology", "sports"]
+  keywords            String[]  // ["AI", "cryptocurrency", "climate"]
 
   // Settings
-  emailNotifications Boolean @default(false)
-  articlesPerDay     Int     @default(20)
+  emailNotifications  Boolean   @default(false)
+  pushNotifications   Boolean   @default(true)
+  articlesPerDay      Int       @default(20)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@map("user_preferences")
 }
@@ -94,25 +100,28 @@ model UserPreference {
 model Article {
   id          String   @id @default(cuid())
   title       String
-  description String
-  content     String
+  description String?  @db.Text
+  content     String?  @db.Text
   url         String   @unique
-  urlToImage  String
+  urlToImage  String?
   publishedAt DateTime
   source      String
-  author      String
+  author      String?
   category    String   @default("general")
   country     String   @default("us")
   language    String   @default("en")
 
   // AI-generated fields
-  summary     String?
-  sentiment   String?
-  keywords    String[]
+  summary     String?  @db.Text
+  sentiment   String?  // "positive", "negative", "neutral"
+  keywords    String[] // AI extracted keywords
+  topics      String[] // AI identified topics
+  importance  Float?   @default(0.5) // 0.0 to 1.0
 
   // Relations
   bookmarks    Bookmark[]
   readArticles ReadArticle[]
+  trending     TrendingTopic[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -139,6 +148,7 @@ model ReadArticle {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   readAt    DateTime @default(now())
+  readTime  Int?     // seconds spent reading
 
   @@unique([userId, articleId])
   @@map("read_articles")
@@ -171,4 +181,44 @@ model ProcessedArticle {
   processedAt DateTime @default(now())
 
   @@map("processed_articles")
+}
+
+// ================== NEW MODELS FROM SECOND SCHEMA ==================
+model TrendingTopic {
+  id          String   @id @default(cuid())
+  topic       String
+  score       Float    @default(1.0)
+  category    String
+  articles    Article[]
+  mentions    Int      @default(1)
+  sentiment   String?  // overall sentiment for this topic
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([topic, category])
+}
+
+model UserNotification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String   @db.Text
+  type      String   // "trending", "recommendation", "bookmark"
+  read      Boolean  @default(false)
+  data      Json?    // Additional data for the notification
+  createdAt DateTime @default(now())
+}
+
+model Analytics {
+  id           String   @id @default(cuid())
+  date         DateTime @default(now())
+  totalUsers   Int      @default(0)
+  totalArticles Int     @default(0)
+  totalViews   Int      @default(0)
+  topCategories Json?   // {"business": 150, "technology": 200}
+  topSources   Json?    // {"bbc": 100, "cnn": 120}
+  sentimentBreakdown Json? // {"positive": 60, "negative": 20, "neutral": 20}
+  
+  @@unique([date])
 }
