@@ -5,7 +5,9 @@ import "./globals.css"
 import { Providers } from "@/components/providers"
 import Link from "next/link"
 import { NotificationBadge } from "@/components/ui/notification-badge"
-import { UserMenu } from "@/components/ui/user-menu" // Fixed import
+import { UserMenu } from "@/components/ui/user-menu"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,68 +24,59 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const session = await getServerSession(authOptions)
+  
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.className} antialiased`}>
         <Providers>
-          {/* ✅ Navigation Bar */}
+          {/* Navigation Bar */}
           <header className="w-full border-b bg-white shadow-sm sticky top-0 z-50">
             <nav className="container mx-auto flex items-center justify-between p-4">
               {/* Logo / Brand */}
               <Link href="/" className="text-xl font-bold text-blue-600">
                 NewsGenie
               </Link>
+              
               {/* Nav Links */}
               <div className="flex gap-6">
-                <Link
-                  href="/"
-                  className="text-gray-700 hover:text-blue-600 transition"
-                >
-                  Home
-                </Link>
-                <Link
-                  href="/categories"
-                  className="text-gray-700 hover:text-blue-600 transition"
-                >
-                  Categories
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="text-gray-700 hover:text-blue-600 transition"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/chat"
-                  className="text-gray-700 hover:text-blue-600 transition"
-                >
-                  AI Chat
-                </Link>
-                <Link
-                  href="/trending"
-                  className="text-gray-700 hover:text-blue-600 transition"
-                >
-                  Trending
-                </Link>
-                <Link
-                  href="/about"
-                  className="text-gray-700 hover:text-blue-600 transition"
-                >
-                  About
-                </Link>
+                {session && (
+                  <>
+                    <Link
+                      href="/"
+                      className="text-gray-700 hover:text-blue-600 transition"
+                    >
+                      Home
+                    </Link>
+                    <Link
+                      href="/dashboard"
+                      className="text-gray-700 hover:text-blue-600 transition"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      href="/chat"
+                      className="text-gray-700 hover:text-blue-600 transition"
+                    >
+                      AI Chat
+                    </Link>
+                  </>
+                )}
               </div>
+              
               {/* Right side: Notifications and User Menu */}
               <div className="flex items-center space-x-2">
-                <NotificationBadge />
+                {session && <NotificationBadge />}
                 <UserMenu />
               </div>
             </nav>
           </header>
+          
           {/* Page Content */}
           <main className="container mx-auto p-6">{children}</main>
         </Providers>
