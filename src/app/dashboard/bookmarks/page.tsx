@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -9,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, ExternalLink, BookmarkCheck, Calendar, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ArrowLeft, ExternalLink, BookmarkCheck, Calendar, Trash2, BookOpen, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import toast, { Toaster } from 'react-hot-toast';
@@ -35,9 +35,23 @@ interface BookmarkedArticle {
 export default function BookmarksPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-
   const [bookmarks, setBookmarks] = useState<BookmarkedArticle[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Mark article as read
+  const markAsRead = async (articleId: string) => {
+    try {
+      await fetch('/api/read-articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ articleId }),
+      });
+    } catch (error) {
+      console.error('Error marking article as read:', error);
+    }
+  };
 
   // Fetch bookmarks
   const fetchBookmarks = async () => {
@@ -45,7 +59,6 @@ export default function BookmarksPage() {
     try {
       const response = await fetch('/api/bookmarks');
       const data = await response.json();
-
       if (response.ok) {
         setBookmarks(data);
       } else {
@@ -67,7 +80,6 @@ export default function BookmarksPage() {
       const response = await fetch(`/api/bookmarks?articleId=${articleId}`, {
         method: 'DELETE',
       });
-
       if (response.ok) {
         setBookmarks(prev => prev.filter(b => b.article.id !== articleId));
         toast.success('Bookmark removed');
@@ -85,13 +97,11 @@ export default function BookmarksPage() {
   // Run effects after hooks (do redirect client-side and fetch bookmarks)
   useEffect(() => {
     if (status === 'loading') return;
-
     if (status === 'unauthenticated') {
       // client-side redirect
       router.replace('/');
       return;
     }
-
     // only fetch when session is available / authenticated
     if (session) {
       fetchBookmarks();
@@ -102,7 +112,6 @@ export default function BookmarksPage() {
   // Bookmark Card Component
   const BookmarkCard = ({ bookmark }: { bookmark: BookmarkedArticle }) => {
     const { article } = bookmark;
-
     return (
       <Card className="mb-4 hover:shadow-lg transition-shadow">
         <CardContent className="p-0">
@@ -147,15 +156,12 @@ export default function BookmarksPage() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-
               <h3 className="text-lg font-semibold mb-2 line-clamp-2">
                 {article.title}
               </h3>
-
               <p className="text-gray-600 mb-3 line-clamp-2">
                 {article.description}
               </p>
-
               {article.summary && (
                 <div className="bg-blue-50 p-3 rounded-md mb-3">
                   <p className="text-sm text-blue-800">
@@ -163,7 +169,6 @@ export default function BookmarksPage() {
                   </p>
                 </div>
               )}
-
               {article.keywords && article.keywords.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
                   {article.keywords.slice(0, 3).map((keyword, index) => (
@@ -173,7 +178,6 @@ export default function BookmarksPage() {
                   ))}
                 </div>
               )}
-
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
@@ -185,21 +189,41 @@ export default function BookmarksPage() {
                     </>
                   )}
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  asChild
-                >
-                  <a
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1"
-                  >
-                    Read Article <ExternalLink className="h-3 w-3" />
-                  </a>
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Read Options <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <a 
+                        href={article.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={() => markAsRead(article.id)}
+                        className="flex items-center w-full"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Read on Website
+                      </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link 
+                        href={`/article/${article.id}`}
+                        onClick={() => markAsRead(article.id)}
+                        className="flex items-center w-full"
+                      >
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Read in App
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
@@ -220,7 +244,6 @@ export default function BookmarksPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <Toaster position="top-right" />
-
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Link href="/dashboard">
@@ -236,7 +259,6 @@ export default function BookmarksPage() {
           </p>
         </div>
       </div>
-
       {/* Bookmarks List */}
       {loading ? (
         <div className="space-y-4">
