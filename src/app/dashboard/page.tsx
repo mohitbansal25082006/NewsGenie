@@ -1,3 +1,4 @@
+// E:\newsgenie\src\app\dashboard\page.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
@@ -10,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { Search, BookmarkPlus, BookmarkCheck, ExternalLink, TrendingUp, Calendar, Heart, Eye, Settings, Loader2 } from 'lucide-react';
+import { Search, BookmarkPlus, BookmarkCheck, ExternalLink, TrendingUp, Calendar, Heart, Eye, Settings, Loader2, BookOpen, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -331,22 +333,41 @@ export default function DashboardPage() {
                   )}
                 </div>
                 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  asChild
-                  onClick={() => markAsRead(article.id)}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  <a 
-                    href={article.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1"
-                  >
-                    Read More <ExternalLink className="h-3 w-3" />
-                  </a>
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Read Options <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <a 
+                        href={article.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={() => markAsRead(article.id)}
+                        className="flex items-center w-full"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Read on Website
+                      </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link 
+                        href={`/article/${article.id}`}
+                        onClick={() => markAsRead(article.id)}
+                        className="flex items-center w-full"
+                      >
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Read in App
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>

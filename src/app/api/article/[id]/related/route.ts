@@ -4,12 +4,15 @@ import { db } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // First, get the current article to find related ones
+    // First, await the params object
+    const resolvedParams = await params;
+    
+    // Get the current article to find related ones
     const currentArticle = await db.article.findUnique({
-      where: { id: params.id },
+      where: { id: resolvedParams.id },
     });
 
     if (!currentArticle) {
