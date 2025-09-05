@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  preferences   UserPreferences?
+  bookmarks     Bookmark[]
+  readingHistory ReadingHistory[]
+
+  @@map("users")
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
+
+// User preferences for news customization
+model UserPreferences {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  interests  String[] // ["technology", "business", "sports"]
+  sources    String[] // Preferred news sources
+  language   String   @default("en")
+  country    String   @default("us")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// Bookmarked articles
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  articleId String   // External article ID
+  title     String
+  url       String
+  imageUrl  String?
+  summary   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@map("bookmarks")
+}
+
+// Track reading history for recommendations
+model ReadingHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  articleId   String
+  title       String
+  category    String
+  sentiment   String?  // positive, negative, neutral
+  timeSpent   Int?     // seconds spent reading
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reading_history")
+}
+
+// Cache for processed articles
+model ProcessedArticle {
+  id          String   @id @default(cuid())
+  articleId   String   @unique
+  title       String
+  summary     String
+  sentiment   String   // positive, negative, neutral
+  keywords    String[] // Extracted keywords
+  category    String
+  processedAt DateTime @default(now())
+
+  @@map("processed_articles")
+}
