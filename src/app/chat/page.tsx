@@ -23,7 +23,8 @@ import {
   Loader2,
   Trash2,
   Clock,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
@@ -48,6 +49,12 @@ interface TopicExploration {
   suggestedQuestions: string[];
 }
 
+interface BriefingData {
+  briefing: string;
+  articlesCount: number;
+  latestArticleDate: string;
+}
+
 export default function ChatPage() {
   const { data: session, status } = useSession();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -56,7 +63,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [topicExploration, setTopicExploration] = useState<TopicExploration | null>(null);
-  const [briefing, setBriefing] = useState<string | null>(null);
+  const [briefing, setBriefing] = useState<BriefingData | null>(null);
   const [activeTab, setActiveTab] = useState('chat');
   const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -146,7 +153,11 @@ export default function ChatPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({ 
+          message: userMessage,
+          // Include a flag to prioritize latest news
+          prioritizeLatest: true 
+        }),
       });
 
       if (response.ok) {
@@ -230,7 +241,7 @@ export default function ChatPage() {
       const response = await fetch('/api/chat/personalized-briefing');
       if (response.ok) {
         const data = await response.json();
-        setBriefing(data.briefing);
+        setBriefing(data);
         setActiveTab('briefing');
       } else {
         console.error('Failed to generate briefing');
@@ -265,6 +276,41 @@ export default function ChatPage() {
       </div>
     );
   }
+
+  const formatBriefingContent = (content: string) => {
+    // Split content into sections based on double line breaks
+    const sections = content.split('\n\n').filter(section => section.trim());
+    
+    return sections.map((section, index) => {
+      // Check if section is a heading (starts with # or **)
+      if (section.startsWith('# ') || section.startsWith('## ')) {
+        const level = section.startsWith('# ') ? 'text-xl' : 'text-lg';
+        const text = section.replace(/^#+\s*/, '');
+        return (
+          <h2 key={index} className={`font-bold ${level} mt-6 mb-3 text-gray-800`}>
+            {text}
+          </h2>
+        );
+      }
+      
+      // Check if section is a subheading (starts with **)
+      if (section.startsWith('**') && section.endsWith('**')) {
+        const text = section.replace(/\*\*/g, '');
+        return (
+          <h3 key={index} className="font-semibold text-md mt-4 mb-2 text-gray-700">
+            {text}
+          </h3>
+        );
+      }
+      
+      // Regular paragraph
+      return (
+        <p key={index} className="mb-4 text-gray-700 leading-relaxed">
+          {section}
+        </p>
+      );
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -430,7 +476,7 @@ export default function ChatPage() {
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             onKeyDown={handleKeyPress}
-                            placeholder="Type your message..."
+                            placeholder="Ask about the latest news or current events..."
                             disabled={isLoading}
                             className="flex-1"
                           />
@@ -546,16 +592,49 @@ export default function ChatPage() {
 
             <TabsContent value="briefing" className="flex-1 mt-0">
               <Card className="h-full flex flex-col">
-                <CardHeader>
-                  <CardTitle>Personalized Briefing</CardTitle>
-                  <CardDescription>
-                    Your daily news briefing based on your interests and reading history
-                  </CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Personalized Briefing</CardTitle>
+                    <CardDescription>
+                      Your daily news briefing based on your interests and reading history
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={generateBriefing}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Refresh
+                  </Button>
                 </CardHeader>
                 <CardContent className="flex-1">
                   {briefing ? (
-                    <div className="prose max-w-none h-full overflow-auto">
-                      <p className="whitespace-pre-line leading-relaxed">{briefing}</p>
+                    <div className="h-full overflow-auto">
+                      <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center text-sm text-blue-800">
+                          <FileText className="h-4 w-4 mr-2" />
+                          <span>Generated on {format(new Date(), 'MMMM d, yyyy at h:mm a')}</span>
+                        </div>
+                        <div className="flex items-center text-sm text-blue-700 mt-1">
+                          <span>Based on {briefing.articlesCount} latest articles</span>
+                          {briefing.latestArticleDate && (
+                            <>
+                              <span className="mx-2">•</span>
+                              <span>Latest from {format(new Date(briefing.latestArticleDate), 'MMMM d')}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="prose max-w-none">
+                        {formatBriefingContent(briefing.briefing)}
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-8 h-full flex items-center justify-center">

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { createConversation, getUserConversations } from '@/lib/chat';
+import { NewsAPI } from '@/lib/newsApi';
 
 export async function GET(request: NextRequest) {
   try {
