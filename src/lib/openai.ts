@@ -1,5 +1,7 @@
 // E:\newsgenie\src\lib\openai.ts
 import OpenAI from 'openai';
+import { JSDOM } from 'jsdom';
+import { Readability } from '@mozilla/readability';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 // Make the model configurable via env. Default to a reliable production model you have access to.
@@ -260,8 +262,7 @@ export async function answerQuestionAboutArticleWithWebScraping(
    ------------------------- */
 
 /**
- * (Placeholder) Extract article content from URL.
- * Replace this with your own scraping/extractor integration.
+ * Extract article content from URL using Readability.js
  */
 export async function extractArticleContentFromUrl(url: string): Promise<{
   title: string;
@@ -270,18 +271,66 @@ export async function extractArticleContentFromUrl(url: string): Promise<{
   publishDate?: string;
 }> {
   try {
-    console.log(`extractArticleContentFromUrl called for ${url}`);
-    // Placeholder implementation — swap in your extractor or third-party API
+    console.log(`Extracting content from URL: ${url}`);
+    
+    // Fetch the HTML content
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch article: ${response.status} ${response.statusText}`);
+    }
+    
+    const html = await response.text();
+    
+    // Parse the HTML
+    const dom = new JSDOM(html, { url });
+    
+    // Use Readability to extract the article content
+    const reader = new Readability(dom.window.document);
+    const article = reader.parse();
+    
+    if (!article) {
+      throw new Error('Failed to parse article content');
+    }
+    
+    // Clean up the content
+    let cleanContent = article.content
+      ? article.content
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove styles
+          .replace(/<[^>]+>/g, '') // Remove HTML tags
+          .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+          .trim()
+      : '';
+    
+    // If content is too short, try alternative extraction
+    if (cleanContent.length < 200) {
+      // Try to get text from paragraphs
+      const paragraphs = Array.from(dom.window.document.querySelectorAll('p'));
+      cleanContent = paragraphs
+        .map(p => (p as HTMLElement).textContent?.trim())
+        .filter((text): text is string => text !== undefined && text.length > 20)
+        .join('\n\n');
+    }
+    
+    return {
+      title: article.title || '',
+      content: cleanContent,
+      author: article.byline || undefined,
+      publishDate: article.publishedTime || undefined
+    };
+  } catch (error) {
+    console.error('Error extracting article content:', error);
     return {
       title: '',
       content: '',
-      author: '',
-      publishDate: '',
+      author: undefined,
+      publishDate: undefined
     };
-  } catch (error: unknown) {
-    if (error instanceof Error) console.error('Error extracting article content:', error.message);
-    else console.error('Error extracting article content (unknown):', error);
-    return { title: '', content: '' };
   }
 }
 

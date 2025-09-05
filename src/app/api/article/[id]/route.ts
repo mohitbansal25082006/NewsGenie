@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { extractArticleContentFromUrl } from '@/lib/openai';
 
 export async function GET(
   request: NextRequest,
@@ -20,10 +21,38 @@ export async function GET(
       return NextResponse.json({ error: 'Article not found' }, { status: 404 });
     }
     
-    // If user is authenticated, increment view count and mark as read
+    // Check if content is truncated (indicated by "[+")
+    const isTruncated = article.content && article.content.includes('[+');
+    
+    // If content is truncated and we have a URL, try to fetch full content
+    if (isTruncated && article.url) {
+      try {
+        const extractedContent = await extractArticleContentFromUrl(article.url);
+        if (extractedContent.content) {
+          // Update the article with full content
+          const updatedArticle = await db.article.update({
+            where: { id: params.id },
+            data: {
+              content: extractedContent.content,
+              author: extractedContent.author || article.author,
+              publishedAt: extractedContent.publishDate ? new Date(extractedContent.publishDate) : article.publishedAt,
+            },
+          });
+          
+          // Use the updated article for the response
+          article.content = updatedArticle.content;
+          article.author = updatedArticle.author;
+          article.publishedAt = updatedArticle.publishedAt;
+        }
+      } catch (error) {
+        console.error('Error extracting full article content:', error);
+        // Continue with truncated content if extraction fails
+      }
+    }
+    
+    // If user is authenticated, mark as read
     const session = await getServerSession(authOptions);
     if (session?.user?.id) {
-      // Mark article as read
       try {
         await db.readArticle.upsert({
           where: {
@@ -136,13 +165,57 @@ export async function DELETE(
   }
 }
 
-// New endpoint to handle article Q&A
+// New endpoint to handle article Q&A and fetching full content
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const params = await context.params;
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+    
+    // Handle fetch-full action
+    if (action === 'fetch-full') {
+      const article = await db.article.findUnique({
+        where: { id: params.id },
+      });
+      
+      if (!article) {
+        return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+      }
+      
+      if (!article.url) {
+        return NextResponse.json({ error: 'Article URL not available' }, { status: 400 });
+      }
+      
+      try {
+        const extractedContent = await extractArticleContentFromUrl(article.url);
+        if (extractedContent.content) {
+          // Update the article with full content
+          const updatedArticle = await db.article.update({
+            where: { id: params.id },
+            data: {
+              content: extractedContent.content,
+              author: extractedContent.author || article.author,
+              publishedAt: extractedContent.publishDate ? new Date(extractedContent.publishDate) : article.publishedAt,
+            },
+          });
+          
+          return NextResponse.json(updatedArticle);
+        } else {
+          return NextResponse.json({ error: 'Failed to extract content' }, { status: 500 });
+        }
+      } catch (error) {
+        console.error('Error extracting full article content:', error);
+        return NextResponse.json(
+          { error: 'Failed to extract article content' },
+          { status: 500 }
+        );
+      }
+    }
+    
+    // Handle Q&A action (default)
     const body = await request.json();
     const { question } = body;
     
@@ -173,9 +246,9 @@ export async function POST(
       articleTitle: article.title,
     });
   } catch (error) {
-    console.error('Error answering article question:', error);
+    console.error('Error in POST request:', error);
     return NextResponse.json(
-      { error: 'Failed to answer question' },
+      { error: 'Failed to process request' },
       { status: 500 }
     );
   }

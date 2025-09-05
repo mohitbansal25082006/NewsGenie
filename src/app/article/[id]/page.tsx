@@ -55,12 +55,10 @@ type SentimentOverall = 'positive' | 'negative' | 'neutral';
 
 interface AnalysisData {
   summary: string;
-  // Keep sentiment string for badges/compat
   sentiment?: SentimentOverall | string;
-  // New structured details for the Sentiment tab
   sentimentDetails?: {
     overall: SentimentOverall;
-    score: number; // 0..1
+    score: number;
     explanation: string;
   };
   bias?: {
@@ -110,14 +108,38 @@ export default function ArticlePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [isUpdatingContent, setIsUpdatingContent] = useState(false);
+  const [isContentTruncated, setIsContentTruncated] = useState(false);
   
   const fetchArticle = useCallback(async () => {
     setLoading(true);
+    setIsUpdatingContent(true);
     try {
       const response = await fetch(`/api/article/${articleId}`);
       if (response.ok) {
         const data: Article = await response.json();
         setArticle(data);
+        
+        // Check if content is truncated
+        if (data.content.includes('[+')) {
+          setIsContentTruncated(true);
+          // Try to fetch full content
+          try {
+            const fullResponse = await fetch(`/api/article/${articleId}/fetch-full`, {
+              method: 'POST',
+            });
+            if (fullResponse.ok) {
+              const fullData: Article = await fullResponse.json();
+              setArticle(fullData);
+              setIsContentTruncated(false);
+            }
+          } catch (error) {
+            console.error('Error fetching full article:', error);
+          }
+        } else {
+          setIsContentTruncated(false);
+        }
+        
         if (session) {
           markAsRead(articleId);
         }
@@ -131,8 +153,31 @@ export default function ArticlePage() {
       router.push('/');
     } finally {
       setLoading(false);
+      setIsUpdatingContent(false);
     }
   }, [articleId, session, router]);
+  
+  const fetchFullContent = async () => {
+    setIsUpdatingContent(true);
+    try {
+      const response = await fetch(`/api/article/${articleId}/fetch-full`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const data: Article = await response.json();
+        setArticle(data);
+        setIsContentTruncated(false);
+        toast.success('Full article loaded');
+      } else {
+        toast.error('Failed to load full article');
+      }
+    } catch (error) {
+      console.error('Error fetching full article:', error);
+      toast.error('Error loading full article');
+    } finally {
+      setIsUpdatingContent(false);
+    }
+  };
   
   const fetchRelatedArticles = useCallback(async () => {
     setRelatedLoading(true);
@@ -253,15 +298,12 @@ export default function ArticlePage() {
         const data: AnalysisData = await response.json();
         setAnalysisData(data);
         setShowAnalysis(true);
-
-        // Only update safe fields on the Article object to avoid type collisions.
         setArticle(prev => prev ? {
           ...prev,
           summary: data.summary ?? prev.summary,
           sentiment: (data.sentiment as Article['sentiment']) ?? prev.sentiment,
-          keywords: data.entities ? prev.keywords : prev.keywords, // keep existing unless you also return keywords
+          keywords: data.entities ? prev.keywords : prev.keywords,
         } : null);
-
         toast.success('Article analysis completed');
       } else {
         toast.error('Failed to analyze article');
@@ -836,12 +878,47 @@ export default function ArticlePage() {
         )}
         
         {/* Article Content */}
-        <Card>
+        <Card className="mb-8">
           <CardContent className="pt-6">
-            <div className="prose max-w-none">
-              <p className="text-lg font-medium mb-4">{article.description}</p>
-              <div className="whitespace-pre-line">{article.content}</div>
-            </div>
+            {/* Load Full Article Button */}
+            {isContentTruncated && !isUpdatingContent && (
+              <div className="mb-4 flex justify-center">
+                <Button 
+                  onClick={fetchFullContent} 
+                  disabled={isUpdatingContent}
+                  variant="outline"
+                >
+                  {isUpdatingContent ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Loading full article...
+                    </>
+                  ) : (
+                    'Load Full Article'
+                  )}
+                </Button>
+              </div>
+            )}
+            
+            {/* Article Content */}
+            {isUpdatingContent ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+              </div>
+            ) : (
+              <div className="prose prose-lg max-w-none">
+                <p className="text-lg font-medium mb-4 leading-relaxed">{article.description}</p>
+                
+                {/* Format article content with paragraphs */}
+                <div className="space-y-4">
+                  {article.content.split('\n\n').map((paragraph, index) => (
+                    <p key={index} className="text-gray-700 leading-relaxed">
+                      {paragraph.trim()}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
         
