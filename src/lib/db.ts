@@ -9,6 +9,9 @@ export const prisma = globalForPrisma.prisma ??
     log: ['query'],
   })
 
+// Export as 'db' for consistency with the route files
+export const db = prisma
+
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma
 }

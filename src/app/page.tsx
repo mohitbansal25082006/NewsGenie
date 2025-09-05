@@ -1,5 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+'use client';
+
+import { useSession, signIn } from 'next-auth/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   BookOpen, 
   Brain, 
@@ -10,15 +15,70 @@ import {
   Globe, 
   BarChart3,
   Sparkles,
-} from "lucide-react"
-import { Navbar } from "@/components/navbar"
-import { AuthButtons } from "@/components/auth-buttons"
+  Newspaper,
+  ArrowRight,
+  Github,
+  Chrome
+} from 'lucide-react';
+import Link from 'next/link';
 
 export default function HomePage() {
+  const { data: session, status } = useSession();
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
       {/* Navigation Header */}
-      <Navbar />
+      <nav className="border-b bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-lg">
+              <Newspaper className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              NewsGenie
+            </span>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            {session ? (
+              <>
+                <Link href="/dashboard">
+                  <Button>
+                    Dashboard <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={session.user?.image || ''} />
+                    <AvatarFallback>
+                      {session.user?.name?.charAt(0) || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              </>
+            ) : (
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => signIn('google')}
+                  className="flex items-center space-x-2"
+                >
+                  <Chrome className="h-4 w-4" />
+                  <span>Sign in</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
 
       {/* Hero Section */}
       <section className="py-20 md:py-32">
@@ -43,7 +103,33 @@ export default function HomePage() {
             </p>
 
             <div className="mb-12">
-              <AuthButtons />
+              {!session ? (
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <Button 
+                    size="lg"
+                    onClick={() => signIn('google')}
+                    className="flex items-center space-x-2"
+                  >
+                    <Chrome className="h-5 w-5" />
+                    <span>Continue with Google</span>
+                  </Button>
+                  <Button 
+                    size="lg"
+                    variant="outline"
+                    onClick={() => signIn('github')}
+                    className="flex items-center space-x-2"
+                  >
+                    <Github className="h-5 w-5" />
+                    <span>Continue with GitHub</span>
+                  </Button>
+                </div>
+              ) : (
+                <Link href="/dashboard">
+                  <Button size="lg" className="text-lg px-8">
+                    Go to Dashboard <ArrowRight className="h-5 w-5 ml-2" />
+                  </Button>
+                </Link>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto text-sm text-slate-500 dark:text-slate-400">
@@ -243,24 +329,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-20 bg-white dark:bg-slate-900">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-              Start for free and upgrade when you need more features
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Pricing cards content remains the same as before */}
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4 text-center">
@@ -272,7 +340,33 @@ export default function HomePage() {
               Join thousands of users who already enjoy personalized, AI-curated news
             </p>
             
-            <AuthButtons />
+            {!session ? (
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <Button 
+                  size="lg"
+                  onClick={() => signIn('google')}
+                  className="flex items-center space-x-2"
+                >
+                  <Chrome className="h-5 w-5" />
+                  <span>Continue with Google</span>
+                </Button>
+                <Button 
+                  size="lg"
+                  variant="outline"
+                  onClick={() => signIn('github')}
+                  className="flex items-center space-x-2"
+                >
+                  <Github className="h-5 w-5" />
+                  <span>Continue with GitHub</span>
+                </Button>
+              </div>
+            ) : (
+              <Link href="/dashboard">
+                <Button size="lg" className="text-lg px-8">
+                  Go to Dashboard <ArrowRight className="h-5 w-5 ml-2" />
+                </Button>
+              </Link>
+            )}
             
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
               No credit card required • Free forever plan available
@@ -303,7 +397,7 @@ export default function HomePage() {
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
                 <li><a href="#features" className="hover:text-blue-600 transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-blue-600 transition-colors">Pricing</a></li>
+                <li><a href="#how-it-works" className="hover:text-blue-600 transition-colors">How It Works</a></li>
                 <li><a href="#" className="hover:text-blue-600 transition-colors">API</a></li>
                 <li><a href="#" className="hover:text-blue-600 transition-colors">Documentation</a></li>
               </ul>
@@ -335,5 +429,5 @@ export default function HomePage() {
         </div>
       </footer>
     </div>
-  )
+  );
 }

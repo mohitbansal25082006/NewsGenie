@@ -1,6 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
+// ================== GENERATORS & DATASOURCE ==================
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,27 +8,27 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model for authentication
+// ================== USER & AUTH ==================
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String          @id @default(cuid())
+  name           String?
+  email          String?         @unique
+  emailVerified  DateTime?
+  image          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   // Relations
-  accounts      Account[]
-  sessions      Session[]
-  preferences   UserPreferences?
-  bookmarks     Bookmark[]
+  accounts       Account[]
+  sessions       Session[]
+  userPreference UserPreference?
+  bookmarks      Bookmark[]
+  readArticles   ReadArticle[]
   readingHistory ReadingHistory[]
 
   @@map("users")
 }
 
-// NextAuth required models
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -70,48 +68,91 @@ model VerificationToken {
   @@map("verificationtokens")
 }
 
-// User preferences for news customization
-model UserPreferences {
-  id         String   @id @default(cuid())
-  userId     String   @unique
-  interests  String[] // ["technology", "business", "sports"]
-  sources    String[] // Preferred news sources
-  language   String   @default("en")
-  country    String   @default("us")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+// ================== USER PREFERENCES ==================
+model UserPreference {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Preferences
+  interests String[]
+  sources   String[]
+  language  String   @default("en")
+  country   String   @default("us")
+
+  // Settings
+  emailNotifications Boolean @default(false)
+  articlesPerDay     Int     @default(20)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("user_preferences")
 }
 
-// Bookmarked articles
+// ================== ARTICLES ==================
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  content     String
+  url         String   @unique
+  urlToImage  String
+  publishedAt DateTime
+  source      String
+  author      String
+  category    String   @default("general")
+  country     String   @default("us")
+  language    String   @default("en")
+
+  // AI-generated fields
+  summary     String?
+  sentiment   String?
+  keywords    String[]
+
+  // Relations
+  bookmarks    Bookmark[]
+  readArticles ReadArticle[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("articles")
+}
+
 model Bookmark {
   id        String   @id @default(cuid())
   userId    String
-  articleId String   // External article ID
-  title     String
-  url       String
-  imageUrl  String?
-  summary   String?
+  articleId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, articleId])
   @@map("bookmarks")
 }
 
-// Track reading history for recommendations
+model ReadArticle {
+  id        String   @id @default(cuid())
+  userId    String
+  articleId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  readAt    DateTime @default(now())
+
+  @@unique([userId, articleId])
+  @@map("read_articles")
+}
+
+// ================== READING HISTORY & PROCESSED ARTICLES ==================
 model ReadingHistory {
   id          String   @id @default(cuid())
   userId      String
   articleId   String
   title       String
   category    String
-  sentiment   String?  // positive, negative, neutral
-  timeSpent   Int?     // seconds spent reading
+  sentiment   String?
+  timeSpent   Int?
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -119,14 +160,13 @@ model ReadingHistory {
   @@map("reading_history")
 }
 
-// Cache for processed articles
 model ProcessedArticle {
   id          String   @id @default(cuid())
   articleId   String   @unique
   title       String
   summary     String
-  sentiment   String   // positive, negative, neutral
-  keywords    String[] // Extracted keywords
+  sentiment   String
+  keywords    String[]
   category    String
   processedAt DateTime @default(now())
 
