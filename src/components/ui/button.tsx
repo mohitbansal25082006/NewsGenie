@@ -42,12 +42,24 @@ interface ButtonProps
   asChild?: boolean;
 }
 
-const Button = React.forwardRef<HTMLElement, ButtonProps>(
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
+    
+    // Handle ref type based on whether it's a Slot or button
+    if (asChild) {
+      return (
+        <Slot
+          ref={ref as React.Ref<HTMLElement>}
+          className={cn(buttonVariants({ variant, size, className }))}
+          {...props}
+        />
+      );
+    }
+    
     return (
       <Comp
-        ref={ref as any} // Slot does not accept <button> ref type
+        ref={ref}
         className={cn(buttonVariants({ variant, size, className }))}
         {...props}
       />
