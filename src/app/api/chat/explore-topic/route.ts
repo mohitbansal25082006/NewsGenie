@@ -20,16 +20,18 @@ interface ExploreTopicResponse {
   sources: string[];
   webSearchResults?: WebSearchResult[];
   detailedReport?: string;
-  reportSections?: {
-    overview: string;
-    keyPoints: string[];
-    currentDevelopments: string;
-    historicalContext: string;
-    impact: string;
-    futureOutlook: string;
-    controversies: string;
-    resources: string[];
-  };
+  reportSections?: ReportSections;
+}
+
+interface ReportSections {
+  overview: string;
+  keyPoints: string[];
+  currentDevelopments: string;
+  historicalContext: string;
+  impact: string;
+  futureOutlook: string;
+  controversies: string;
+  resources: string[];
 }
 
 /**
@@ -38,28 +40,61 @@ interface ExploreTopicResponse {
  */
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
+/**
+ * Minimal typed shape for responses from generateEnhancedChatResponse
+ */
+interface AIResponse {
+  response: string;
+}
+
+/**
+ * Strongly-typed function shape expected from the OpenAI helper.
+ * We cast the imported function to this type before calling.
+ */
+type GenerateEnhancedChatResponseFn = (
+  messages: ChatMessage[],
+  contexts?: string[] | undefined,
+  options?: { temperature?: number; maxTokens?: number }
+) => Promise<AIResponse>;
+
+/**
+ * Type guard helpers
+ */
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
+
+function safeParseJson<T = unknown>(text: string): T | null {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    // Avoid potential Boolean(...) call issues by using explicit checks
-    if (!session || !session.user || !session.user.id) {
+    if (!session || !session.user || !(session.user as { id?: string }).id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = (await request.json()) as ExploreTopicRequest;
-    const { 
-      topic, 
-      webSearchEnabled = true, 
-      language = 'en', 
+    const {
+      topic,
+      webSearchEnabled = true,
+      language = 'en',
       location = 'us',
-      generateDetailedReport = false
+      generateDetailedReport = false,
     } = body;
 
     if (!topic || !topic.trim()) {
       return NextResponse.json({ error: 'Topic is required' }, { status: 400 });
     }
 
-    console.log(`Exploring topic: ${topic} (web search: ${webSearchEnabled}, detailed report: ${generateDetailedReport})`);
+    console.log(
+      `Exploring topic: ${topic} (web search: ${webSearchEnabled}, detailed report: ${generateDetailedReport})`
+    );
 
     // Initialize response
     const response: ExploreTopicResponse = {
@@ -77,14 +112,14 @@ export async function POST(request: NextRequest) {
         impact: '',
         futureOutlook: '',
         controversies: '',
-        resources: []
-      }
+        resources: [],
+      },
     };
 
     // Perform web search if enabled
     let webSearchContext = '';
     let webSearchResults: WebSearchResult[] = [];
-    
+
     if (webSearchEnabled) {
       try {
         console.log('Performing web search for topic exploration:', topic);
@@ -98,34 +133,32 @@ export async function POST(request: NextRequest) {
         if (webSearchResults && webSearchResults.length > 0) {
           console.log('Web search returned', webSearchResults.length, 'results');
           response.webSearchResults = webSearchResults;
-          
+
           // Format search results for AI consumption
           const formattedResults = formatWebSearchResults(webSearchResults);
           webSearchContext = `WEB SEARCH RESULTS:\n${formattedResults.join('\n\n')}`;
-          
+
           // Extract sources
-          response.sources = webSearchResults.map((r) => r.link).filter((link): link is string => Boolean(link));
+          response.sources = webSearchResults
+            .map((r) => r.link)
+            .filter((link): link is string => Boolean(link));
         }
       } catch (error) {
         console.error('Web search failed for topic exploration:', error);
       }
     }
 
-    // Get user preferences for personalization
+    // Get user preferences for personalization (guarding unknown shape of session.user)
+    const sessionUser = session.user as { id?: string; interests?: unknown } | undefined;
     const userPreferences = {
-      interests: (session.user as any).interests || [],
+      interests: isStringArray(sessionUser?.interests) ? sessionUser!.interests : [],
       country: location,
       language,
     };
 
     try {
       // Generate basic topic exploration
-      const exploreResult = await exploreNewsTopic(
-        session.user.id,
-        topic,
-        webSearchContext,
-        userPreferences
-      );
+      const exploreResult = await exploreNewsTopic(sessionUser!.id as string, topic, webSearchContext, userPreferences);
 
       if (exploreResult.explanation) {
         response.explanation = exploreResult.explanation;
@@ -146,16 +179,11 @@ export async function POST(request: NextRequest) {
       // Generate detailed report if requested
       if (generateDetailedReport) {
         console.log('Generating detailed report for topic:', topic);
-        const detailedReport = await generateComprehensiveReport(
-          topic,
-          webSearchResults,
-          userPreferences,
-          exploreResult
-        );
+        const detailedReport = await generateComprehensiveReport(topic, webSearchResults, userPreferences, exploreResult);
 
         response.detailedReport = detailedReport.content;
         response.reportSections = detailedReport.sections;
-        
+
         // Add any additional sources from the detailed report
         if (detailedReport.sources && Array.isArray(detailedReport.sources)) {
           response.sources = [...new Set([...response.sources, ...detailedReport.sources])];
@@ -163,14 +191,10 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error exploring topic:', error);
-      
+
       // Fallback to basic exploration
       response.explanation = `I'm currently unable to explore the topic "${topic}" in detail. This might be due to technical difficulties or the topic being too specialized.`;
-      response.relatedTopics = [
-        `${topic} overview`,
-        `Recent developments in ${topic}`,
-        `Impact of ${topic} on society`,
-      ];
+      response.relatedTopics = [`${topic} overview`, `Recent developments in ${topic}`, `Impact of ${topic} on society`];
       response.suggestedQuestions = [
         `What is ${topic}?`,
         `Why is ${topic} important?`,
@@ -199,16 +223,7 @@ async function generateComprehensiveReport(
   baseExploration: { explanation: string; relatedTopics: string[]; suggestedQuestions: string[] }
 ): Promise<{
   content: string;
-  sections: {
-    overview: string;
-    keyPoints: string[];
-    currentDevelopments: string;
-    historicalContext: string;
-    impact: string;
-    futureOutlook: string;
-    controversies: string;
-    resources: string[];
-  };
+  sections: ReportSections;
   sources?: string[];
 }> {
   try {
@@ -255,50 +270,44 @@ async function generateComprehensiveReport(
     Related Topics: ${baseExploration.relatedTopics.join(', ')}
     Suggested Questions: ${baseExploration.suggestedQuestions.join(', ')}`;
 
-    // Generate the detailed report using AI
+    // Prepare messages
     const messages: ChatMessage[] = [
       { role: 'system', content: 'You are an expert research analyst who generates comprehensive, well-structured reports on various topics.' },
-      { role: 'user', content: prompt }
+      { role: 'user', content: prompt },
     ];
 
-    // NOTE: generateEnhancedChatResponse may have multiple overloads in your lib.
-    // Cast to any so we can pass contexts and options; replace cast with proper types when available.
-    const aiResponse = await (generateEnhancedChatResponse as any)(
-      messages,
-      webSearchResults && webSearchResults.length > 0 ? [searchContext] : undefined,
-      {
-        temperature: 0.3,
-        maxTokens: 3000,
-      }
-    );
+    // Cast the imported helper to the typed function and call it
+    const typedGenerate = generateEnhancedChatResponse as unknown as GenerateEnhancedChatResponseFn;
+    const aiResponse = await typedGenerate(messages, webSearchResults && webSearchResults.length > 0 ? [searchContext] : undefined, {
+      temperature: 0.3,
+      maxTokens: 3000,
+    });
 
     // Parse the AI response
-    let reportContent: any;
+    let reportContent: Record<string, unknown> | null = null;
     try {
-      // Try to parse the JSON response
       const jsonMatch = aiResponse.response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        reportContent = JSON.parse(jsonMatch[0]);
+        reportContent = safeParseJson<Record<string, unknown>>(jsonMatch[0]);
       } else {
         throw new Error('No JSON found in response');
       }
-    } catch (error) {
-      console.error('Error parsing AI response as JSON:', error);
-      
+    } catch (parseError) {
+      console.error('Error parsing AI response as JSON:', parseError);
       // Fallback to extracting sections manually
       reportContent = extractSectionsFromText(aiResponse.response);
     }
 
-    // Ensure all required sections exist
-    const sections = {
-      overview: reportContent.overview || 'No overview available.',
-      keyPoints: Array.isArray(reportContent.keyPoints) ? reportContent.keyPoints : [],
-      currentDevelopments: reportContent.currentDevelopments || 'No current developments information available.',
-      historicalContext: reportContent.historicalContext || 'No historical context available.',
-      impact: reportContent.impact || 'No impact information available.',
-      futureOutlook: reportContent.futureOutlook || 'No future outlook available.',
-      controversies: reportContent.controversies || 'No controversies information available.',
-      resources: Array.isArray(reportContent.resources) ? reportContent.resources : []
+    // Build sections with type-safety and fallbacks
+    const sections: ReportSections = {
+      overview: typeof reportContent?.overview === 'string' ? (reportContent.overview as string) : 'No overview available.',
+      keyPoints: isStringArray(reportContent?.keyPoints) ? (reportContent.keyPoints as string[]) : [],
+      currentDevelopments: typeof reportContent?.currentDevelopments === 'string' ? (reportContent.currentDevelopments as string) : 'No current developments information available.',
+      historicalContext: typeof reportContent?.historicalContext === 'string' ? (reportContent.historicalContext as string) : 'No historical context available.',
+      impact: typeof reportContent?.impact === 'string' ? (reportContent.impact as string) : 'No impact information available.',
+      futureOutlook: typeof reportContent?.futureOutlook === 'string' ? (reportContent.futureOutlook as string) : 'No future outlook available.',
+      controversies: typeof reportContent?.controversies === 'string' ? (reportContent.controversies as string) : 'No controversies information available.',
+      resources: isStringArray(reportContent?.resources) ? (reportContent.resources as string[]) : [],
     };
 
     // Generate the formatted report content
@@ -310,18 +319,18 @@ async function generateComprehensiveReport(
     return {
       content: formattedContent,
       sections,
-      sources
+      sources,
     };
   } catch (error) {
     console.error('Error generating detailed report:', error);
-    
+
     // Fallback to a basic report
-    const fallbackSections = {
+    const fallbackSections: ReportSections = {
       overview: `A comprehensive overview of ${topic} is currently unavailable due to technical difficulties.`,
       keyPoints: [
         `${topic} is a significant topic with wide-ranging implications`,
         `Understanding ${topic} requires examining multiple dimensions`,
-        `Recent developments have highlighted the importance of this topic`
+        `Recent developments have highlighted the importance of this topic`,
       ],
       currentDevelopments: 'Information about current developments is unavailable at this time.',
       historicalContext: 'Historical context information is unavailable at this time.',
@@ -330,14 +339,14 @@ async function generateComprehensiveReport(
       controversies: 'Controversies information is unavailable at this time.',
       resources: [
         'https://en.wikipedia.org/wiki/' + encodeURIComponent(topic.replace(/\s+/g, '_')),
-        'https://www.britannica.com/search?query=' + encodeURIComponent(topic)
-      ]
+        'https://www.britannica.com/search?query=' + encodeURIComponent(topic),
+      ],
     };
 
     return {
       content: generateFormattedReport(topic, fallbackSections),
       sections: fallbackSections,
-      sources: fallbackSections.resources
+      sources: fallbackSections.resources,
     };
   }
 }
@@ -345,16 +354,7 @@ async function generateComprehensiveReport(
 /**
  * Generate a formatted report from sections
  */
-function generateFormattedReport(topic: string, sections: {
-  overview: string;
-  keyPoints: string[];
-  currentDevelopments: string;
-  historicalContext: string;
-  impact: string;
-  futureOutlook: string;
-  controversies: string;
-  resources: string[];
-}): string {
+function generateFormattedReport(topic: string, sections: ReportSections): string {
   return `# Comprehensive Report: ${topic}
 
 *Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*
@@ -365,7 +365,7 @@ ${sections.overview}
 
 ## Key Points
 
-${sections.keyPoints.map((point: string) => `- ${point}`).join('\n')}
+${sections.keyPoints.map((point) => `- ${point}`).join('\n')}
 
 ## Current Developments
 
@@ -389,7 +389,7 @@ ${sections.controversies}
 
 ## Resources for Further Reading
 
-${sections.resources.map((resource: string) => `- ${resource}`).join('\n')}
+${sections.resources.map((resource) => `- ${resource}`).join('\n')}
 
 ---
 
@@ -399,8 +399,8 @@ ${sections.resources.map((resource: string) => `- ${resource}`).join('\n')}
 /**
  * Extract sections from text when JSON parsing fails
  */
-function extractSectionsFromText(text: string): any {
-  const sections: any = {
+function extractSectionsFromText(text: string): Record<string, unknown> {
+  const sections: Record<string, unknown> = {
     overview: '',
     keyPoints: [],
     currentDevelopments: '',
@@ -408,7 +408,7 @@ function extractSectionsFromText(text: string): any {
     impact: '',
     futureOutlook: '',
     controversies: '',
-    resources: []
+    resources: [],
   };
 
   // Extract overview
@@ -421,7 +421,10 @@ function extractSectionsFromText(text: string): any {
   const keyPointsMatch = text.match(/## Key Points\s*\n([\s\S]*?)(?=## Current Developments|$)/i);
   if (keyPointsMatch) {
     const keyPointsText = keyPointsMatch[1];
-    const points = keyPointsText.split(/\n\s*-\s*/).filter(p => p.trim());
+    const points = keyPointsText
+      .split(/\n\s*-\s*/)
+      .map((p) => p.trim())
+      .filter((p) => p);
     sections.keyPoints = points;
   }
 
@@ -459,7 +462,10 @@ function extractSectionsFromText(text: string): any {
   const resourcesMatch = text.match(/## Resources for Further Reading\s*\n([\s\S]*?)(?=---|$)/i);
   if (resourcesMatch) {
     const resourcesText = resourcesMatch[1];
-    const resources = resourcesText.split(/\n\s*-\s*/).filter(r => r.trim());
+    const resources = resourcesText
+      .split(/\n\s*-\s*/)
+      .map((r) => r.trim())
+      .filter((r) => r);
     sections.resources = resources;
   }
 
@@ -471,12 +477,12 @@ function extractSectionsFromText(text: string): any {
  */
 function extractSourcesFromText(text: string): string[] {
   const sources: string[] = [];
-  
+
   // Extract URLs
   const urlRegex = /https?:\/\/[^\s\)]+/g;
   const urls = text.match(urlRegex) || [];
   sources.push(...urls);
-  
+
   // Extract resource-like text (after "Resources:" or similar)
   const resourceSection = text.match(/## Resources for Further Reading\s*\n([\s\S]*?)(?=---|$)/i);
   if (resourceSection) {
@@ -488,31 +494,27 @@ function extractSourcesFromText(text: string): string[] {
       }
     }
   }
-  
+
   // Remove duplicates and return
   return [...new Set(sources)];
 }
 
-async function enhanceTopicResponse(
-  response: ExploreTopicResponse,
-  topic: string,
-  hasDetailedReport: boolean
-): Promise<ExploreTopicResponse> {
+async function enhanceTopicResponse(response: ExploreTopicResponse, topic: string, hasDetailedReport: boolean): Promise<ExploreTopicResponse> {
   // Add a title to the explanation if not present
   if (response.explanation) {
     if (!response.explanation.includes(`## ${topic}`)) {
       response.explanation = `## ${topic}\n\n${response.explanation}`;
     }
-    
+
     // Add a timestamp
     response.explanation += `\n\n*Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*`;
-    
+
     // Add a note about the detailed report if available
     if (hasDetailedReport && response.detailedReport) {
       response.explanation += `\n\n*A detailed report on this topic is available below.*`;
     }
   }
-  
+
   // Ensure we have related topics
   if (!response.relatedTopics || response.relatedTopics.length === 0) {
     response.relatedTopics = [
@@ -523,7 +525,7 @@ async function enhanceTopicResponse(
       `${topic} in different cultures`,
     ];
   }
-  
+
   // Ensure we have suggested questions
   if (!response.suggestedQuestions || response.suggestedQuestions.length === 0) {
     response.suggestedQuestions = [
@@ -535,18 +537,16 @@ async function enhanceTopicResponse(
       `Where can I find reliable information about ${topic}?`,
     ];
   }
-  
+
   // Ensure we have sources
   if (!response.sources || response.sources.length === 0) {
     response.sources = [
       `https://en.wikipedia.org/wiki/${encodeURIComponent(topic.replace(/\s+/g, '_'))}`,
       `https://www.britannica.com/search?query=${encodeURIComponent(topic)}`,
-      `https://www.bbc.com/news/topics/${encodeURIComponent(
-        topic.toLowerCase().replace(/\s+/g, '-')
-      )}`,
+      `https://www.bbc.com/news/topics/${encodeURIComponent(topic.toLowerCase().replace(/\s+/g, '-'))}`,
     ];
   }
-  
+
   return response;
 }
 
@@ -563,71 +563,80 @@ async function exploreNewsTopic(
 }> {
   try {
     const preferencesText = userPreferences
-      ? `\n\nUser preferences:\n- Interests: ${userPreferences.interests.join(
-          ', '
-        )}\n- Country: ${userPreferences.country}\n- Language: ${userPreferences.language}`
+      ? `\n\nUser preferences:\n- Interests: ${userPreferences.interests.join(', ')}\n- Country: ${userPreferences.country}\n- Language: ${userPreferences.language}`
       : '';
-    
+
     // Create a prompt for the AI to generate topic exploration
     const prompt = `You are an expert research assistant. Your task is to provide a comprehensive exploration of the topic: "${topic}".
 
     Provide your response in the following format:
-    
+
     EXPLANATION:
     [A detailed explanation of the topic, covering its definition, importance, and key aspects. Include current developments if relevant.]
-    
+
     RELATED TOPICS:
     [5-8 related topics or subtopics, each on a new line starting with "- "]
-    
+
     SUGGESTED QUESTIONS:
     [6-8 thoughtful questions someone might ask about this topic, each on a new line starting with "? "]
-    
+
     SOURCES:
     [3-5 reliable sources for learning more about this topic, each on a new line starting with "- "]
-    
+
     ${webSearchContext ? `Use the following web search results to enhance your response:\n${webSearchContext}` : ''}
     ${preferencesText}`;
 
     // Generate the exploration using AI
     const messages: ChatMessage[] = [
       { role: 'system', content: 'You are an expert research assistant who provides comprehensive topic explorations.' },
-      { role: 'user', content: prompt }
+      { role: 'user', content: prompt },
     ];
 
-    // NOTE: cast to any for flexibility with your library overloads/options.
-    const aiResponse = await (generateEnhancedChatResponse as any)(
-      messages,
-      webSearchContext ? [webSearchContext] : undefined,
-      {
-        temperature: 0.3,
-        maxTokens: 1500,
-      }
-    );
+    const typedGenerate = generateEnhancedChatResponse as unknown as GenerateEnhancedChatResponseFn;
+    const aiResponse = await typedGenerate(messages, webSearchContext ? [webSearchContext] : undefined, {
+      temperature: 0.3,
+      maxTokens: 1500,
+    });
 
     // Parse the response
     const responseText = aiResponse.response;
-    
+
     // Extract sections
     const explanationMatch = responseText.match(/EXPLANATION:\s*\n([\s\S]*?)(?=RELATED TOPICS:|$)/i);
     const explanation = explanationMatch ? explanationMatch[1].trim() : '';
-    
+
     const relatedTopicsMatch = responseText.match(/RELATED TOPICS:\s*\n([\s\S]*?)(?=SUGGESTED QUESTIONS:|$)/i);
     const relatedTopicsLines = relatedTopicsMatch ? relatedTopicsMatch[1] : '';
-    const relatedTopics = relatedTopicsLines.split(/\n\s*-\s*/).filter((t: string) => t.trim());
-    
+    const relatedTopics = relatedTopicsLines
+      ? relatedTopicsLines
+          .split(/\n\s*-\s*/)
+          .map((t) => t.trim())
+          .filter((t) => t)
+      : [];
+
     const suggestedQuestionsMatch = responseText.match(/SUGGESTED QUESTIONS:\s*\n([\s\S]*?)(?=SOURCES:|$)/i);
     const suggestedQuestionsLines = suggestedQuestionsMatch ? suggestedQuestionsMatch[1] : '';
-    const suggestedQuestions = suggestedQuestionsLines.split(/\n\s*\?\s*/).filter((q: string) => q.trim());
-    
+    const suggestedQuestions = suggestedQuestionsLines
+      ? suggestedQuestionsLines
+          .split(/\n\s*\?\s*/)
+          .map((q) => q.trim())
+          .filter((q) => q)
+      : [];
+
     const sourcesMatch = responseText.match(/SOURCES:\s*\n([\s\S]*?)$/i);
     const sourcesLines = sourcesMatch ? sourcesMatch[1] : '';
-    const sources = sourcesLines.split(/\n\s*-\s*/).filter((s: string) => s.trim());
+    const sources = sourcesLines
+      ? sourcesLines
+          .split(/\n\s*-\s*/)
+          .map((s) => s.trim())
+          .filter((s) => s)
+      : [];
 
     return {
       explanation,
       relatedTopics,
       suggestedQuestions,
-      sources
+      sources,
     };
   } catch (error) {
     console.error('Error in exploreNewsTopic:', error);

@@ -752,7 +752,7 @@ export default function ArticlePage() {
                 Ask questions about this article. AI will analyze the original article to provide answers.
                 {isContentTruncated && (
                   <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
-                    The article content appears to be truncated. When you ask a question, we'll automatically fetch the full content from the source for a more complete answer.
+                    The article content appears to be truncated. When you ask a question, we&apos;ll automatically fetch the full content from the source for a more complete answer.
                   </div>
                 )}
               </CardDescription>

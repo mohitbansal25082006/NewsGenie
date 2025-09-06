@@ -4,24 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
-  ArrowRight,
-  CheckCircle,
   Sparkles,
   Users,
   Brain,
-  BarChart3,
-  TrendingUp,
-  Target,
   Globe,
   Shield,
-  Zap,
-  BookOpen,
   Github,
   Twitter,
-  Linkedin,
-  Mail
+  Linkedin
 } from 'lucide-react';
 import Link from 'next/link';
+
 export default function AboutPage() {
   const team = [
     {
@@ -49,6 +42,7 @@ export default function AboutPage() {
       image: "ET"
     }
   ];
+
   const values = [
     {
       title: "Integrity",
@@ -71,6 +65,7 @@ export default function AboutPage() {
       icon: Globe
     }
   ];
+
   const timeline = [
     {
       year: "2022",
@@ -93,6 +88,7 @@ export default function AboutPage() {
       description: "Officially launched NewsGenie to the public with advanced AI features and analytics."
     }
   ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
       {/* Header */}
@@ -109,7 +105,7 @@ export default function AboutPage() {
           </h1>
           
           <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-10 max-w-3xl mx-auto leading-relaxed">
-            We're on a mission to revolutionize how people consume news with AI-powered personalization and insights
+            We&apos;re on a mission to revolutionize how people consume news with AI-powered personalization and insights
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -131,7 +127,7 @@ export default function AboutPage() {
               Our Mission
             </h2>
             <p className="text-xl text-slate-600 dark:text-slate-300 mb-8">
-              At NewsGenie, we believe everyone deserves access to news that's relevant, reliable, and tailored to their interests. We're using cutting-edge AI to transform information overload into actionable insights, helping people stay informed efficiently while exploring the stories that matter most to them.
+              At NewsGenie, we believe everyone deserves access to news that&apos;s relevant, reliable, and tailored to their interests. We&apos;re using cutting-edge AI to transform information overload into actionable insights, helping people stay informed efficiently while exploring the stories that matter most to them.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
               <div className="text-center">
@@ -237,7 +233,7 @@ export default function AboutPage() {
               Our Journey
             </h2>
             <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-              Key milestones in NewsGenie's evolution
+              Key milestones in NewsGenie&apos;s evolution
             </p>
           </div>
           
@@ -247,7 +243,7 @@ export default function AboutPage() {
               <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-blue-200 dark:bg-blue-800"></div>
               
               {timeline.map((item, index) => (
-                <div key={index} className={`mb-12 flex ${index % 2 === 0 ? 'flex-row' : 'flex-row-reverse'} items-center`}>
+                <div key={index} className={`mb-12 flex ${index % 2 === 0 ? 'flex-row' : 'flex-row-reverse'} items-center`}> 
                   <div className="w-1/2 px-8">
                     <Card className="border-slate-200 dark:border-slate-800">
                       <CardHeader>
@@ -279,7 +275,7 @@ export default function AboutPage() {
             Join Our Mission
           </h2>
           <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-            We're always looking for talented people to help us revolutionize news consumption.
+            We&apos;re always looking for talented people to help us revolutionize news consumption.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button asChild size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-slate-100">

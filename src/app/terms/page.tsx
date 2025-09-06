@@ -15,6 +15,7 @@ import {
   Calendar
 } from 'lucide-react';
 import Link from 'next/link';
+
 export default function TermsPage() {
   const lastUpdated = "May 15, 2024";
   return (
@@ -58,14 +59,14 @@ export default function TermsPage() {
             
             <div className="prose prose-lg dark:prose-invert max-w-none">
               <p className="lead">
-                Welcome to NewsGenie! These Terms of Service ("Terms") govern your use of the NewsGenie website, application, and services (collectively, the "Service"). By accessing or using the Service, you agree to be bound by these Terms.
+                Welcome to NewsGenie! These Terms of Service (&quot;Terms&quot;) govern your use of the NewsGenie website, application, and services (collectively, the &quot;Service&quot;). By accessing or using the Service, you agree to be bound by these Terms.
               </p>
               
               <h3>Acceptance of Terms</h3>
               <p>By creating an account or using the Service, you agree to comply with and be bound by these Terms and our Privacy Policy. If you do not agree to these Terms, you may not access or use the Service.</p>
               
               <h3>Changes to Terms</h3>
-              <p>We reserve the right to modify these Terms at any time. We will notify you of any changes by posting the revised Terms on this page and updating the "Last updated" date. Your continued use of the Service after any such changes constitutes your acceptance of the new Terms.</p>
+              <p>We reserve the right to modify these Terms at any time. We will notify you of any changes by posting the revised Terms on this page and updating the &quot;Last updated&quot; date. Your continued use of the Service after any such changes constitutes your acceptance of the new Terms.</p>
               
               <h3>Description of Service</h3>
               <p>NewsGenie is an AI-powered news aggregation platform that curates and delivers personalized news content based on user preferences. The Service includes features such as:</p>
@@ -114,7 +115,7 @@ export default function TermsPage() {
               <p>Upon termination, your right to use the Service will cease immediately. If you wish to terminate your account, you may simply discontinue using the Service.</p>
               
               <h3>Disclaimer of Warranties</h3>
-              <p>The Service is provided on an "as is" and "as available" basis, without any warranties of any kind, either express or implied. We disclaim all warranties, including but not limited to implied warranties of merchantability, fitness for a particular purpose, and non-infringement.</p>
+              <p>The Service is provided on an &quot;as is&quot; and &quot;as available&quot; basis, without any warranties of any kind, either express or implied. We disclaim all warranties, including but not limited to implied warranties of merchantability, fitness for a particular purpose, and non-infringement.</p>
               
               <p>We do not warrant that the Service will be uninterrupted, timely, secure, or error-free. We make no warranties about the accuracy, reliability, completeness, or timeliness of any content provided through the Service.</p>
               
@@ -131,10 +132,10 @@ export default function TermsPage() {
               <p>These Terms shall be governed and construed in accordance with the laws of the State of California, without regard to its conflict of law provisions.</p>
               
               <h3>Dispute Resolution</h3>
-              <p>Any legal action of whatever nature brought by either you or NewsGenie (collectively, the "Parties" and individually, a "Party") shall be commenced or prosecuted in the state and federal courts located in San Francisco County, California, and the Parties hereby consent to, and waive all defenses of lack of personal jurisdiction and forum non conveniens with respect to venue and jurisdiction in such state and federal courts.</p>
+              <p>Any legal action of whatever nature brought by either you or NewsGenie (collectively, the &quot;Parties&quot; and individually, a &quot;Party&quot;) shall be commenced or prosecuted in the state and federal courts located in San Francisco County, California, and the Parties hereby consent to, and waive all defenses of lack of personal jurisdiction and forum non conveniens with respect to venue and jurisdiction in such state and federal courts.</p>
               
               <h3>Indemnification</h3>
-              <p>You agree to indemnify and hold NewsGenie and its parents, subsidiaries, affiliates, officers, employees, agents, partners, and licensors harmless from any claim or demand, including reasonable attorneys' fees, made by any third party due to or arising out of your breach of these Terms or your violation of any law or the rights of a third party.</p>
+              <p>You agree to indemnify and hold NewsGenie and its parents, subsidiaries, affiliates, officers, employees, agents, partners, and licensors harmless from any claim or demand, including reasonable attorneys&apos; fees, made by any third party due to or arising out of your breach of these Terms or your violation of any law or the rights of a third party.</p>
               
               <h3>Severability</h3>
               <p>If any provision of these Terms is found to be unlawful, void, or unenforceable, that provision will be deemed severable from these Terms and will not affect the validity and enforceability of any remaining provisions.</p>

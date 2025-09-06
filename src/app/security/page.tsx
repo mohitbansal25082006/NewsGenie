@@ -22,6 +22,7 @@ import {
   CheckSquare
 } from 'lucide-react';
 import Link from 'next/link';
+
 export default function SecurityPage() {
   const securityMeasures = [
     {
@@ -45,6 +46,7 @@ export default function SecurityPage() {
       icon: Eye
     }
   ];
+
   const certifications = [
     {
       name: "SOC 2 Type II",
@@ -62,6 +64,7 @@ export default function SecurityPage() {
       icon: Server
     }
   ];
+
   const incidentResponse = [
     {
       title: "Detection",
@@ -84,6 +87,7 @@ export default function SecurityPage() {
       description: "Transparent and timely communication with affected users"
     }
   ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
       {/* Header */}
@@ -134,12 +138,12 @@ export default function SecurityPage() {
                   Security First Approach
                 </CardTitle>
                 <CardDescription>
-                  We've built our platform with security as a foundational principle, not an afterthought.
+                  We&apos;ve built our platform with security as a foundational principle, not an afterthought.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-slate-600 dark:text-slate-300">
-                  From the ground up, we've implemented security best practices across our entire infrastructure. Our security-first approach ensures that your data is protected at every stage of its lifecycle, from collection to storage to transmission.
+                  From the ground up, we&apos;ve implemented security best practices across our entire infrastructure. Our security-first approach ensures that your data is protected at every stage of its lifecycle, from collection to storage to transmission.
                 </p>
               </CardContent>
             </Card>
@@ -156,7 +160,7 @@ export default function SecurityPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-slate-600 dark:text-slate-300">
-                  We employ advanced monitoring tools and automated threat detection systems to identify potential security issues in real-time. Our security team is always on standby to respond to incidents and protect our users' data.
+                  We employ advanced monitoring tools and automated threat detection systems to identify potential security issues in real-time. Our security team is always on standby to respond to incidents and protect our users&apos; data.
                 </p>
               </CardContent>
             </Card>
@@ -201,7 +205,7 @@ export default function SecurityPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Certifications & Compliance
+              Certifications &amp; Compliance
             </h2>
             <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
               Our commitment to meeting industry standards and regulatory requirements
@@ -294,7 +298,7 @@ export default function SecurityPage() {
               <CardContent>
                 <div className="prose prose-lg dark:prose-invert max-w-none">
                   <p>
-                    We appreciate the efforts of security researchers and the community in helping us maintain the security of our platform. If you believe you've discovered a security vulnerability, we encourage you to report it to us in a responsible manner.
+                    We appreciate the efforts of security researchers and the community in helping us maintain the security of our platform. If you believe you&apos;ve discovered a security vulnerability, we encourage you to report it to us in a responsible manner.
                   </p>
                   
                   <h3>How to Report</h3>

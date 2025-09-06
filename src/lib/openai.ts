@@ -138,7 +138,6 @@ export async function generateChatResponse(
   try {
     const temperature = options?.temperature ?? 0.25;
     const maxTokens = options?.maxTokens ?? 1500;
-    const includeSources = options?.includeSources ?? true;
     
     let systemMessage =
       'You are NewsGenie, an expert news assistant. Provide clear, accurate, and well-sourced answers. Avoid hallucination. When provided with news context, prefer facts from that context and cite sources inline (Source, date). If something is not supported by provided context, clearly state that.';
@@ -199,7 +198,7 @@ export async function generateEnhancedChatResponse(
     7. Use markdown formatting for better readability`;
 
     // Add context based on available information
-    let contextSections = [];
+    const contextSections = [];
     
     if (webSearchResults && webSearchResults.length > 0) {
       contextSections.push(`WEB SEARCH RESULTS:\n${webSearchResults.join('\n')}`);
@@ -259,7 +258,7 @@ export async function generateAndSaveResponse(
   }
 ): Promise<{ reply: string; saved?: boolean; sources?: string[] }> {
   try {
-    const { articleContext, webSearchContext, regenerate, sources } = options || {};
+    const { articleContext, webSearchContext, regenerate } = options || {};
     
     // If web search context is available, use enhanced response
     if (webSearchContext && webSearchContext.length > 0) {
@@ -705,7 +704,7 @@ export async function generateNewsAnalysis(
     // Try to parse JSON response
     try {
       return JSON.parse(content);
-    } catch (e) {
+    } catch {
       // Fallback if JSON parsing fails
       return {
         summary: content,

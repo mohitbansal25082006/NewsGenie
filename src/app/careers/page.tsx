@@ -22,6 +22,7 @@ import {
   Mail
 } from 'lucide-react';
 import Link from 'next/link';
+
 export default function CareersPage() {
   const jobs = [
     {
@@ -30,7 +31,7 @@ export default function CareersPage() {
       location: "Remote",
       type: "Full-time",
       salary: "$140k - $180k",
-      description: "We're looking for an experienced ML engineer to help build and improve our AI-powered news analysis systems.",
+      description: "We&apos;re looking for an experienced ML engineer to help build and improve our AI-powered news analysis systems.",
       requirements: [
         "5+ years of experience in machine learning",
         "Strong Python skills and experience with ML frameworks",
@@ -105,6 +106,7 @@ export default function CareersPage() {
       ]
     }
   ];
+
   const benefits = [
     {
       title: "Health & Wellness",
@@ -137,6 +139,7 @@ export default function CareersPage() {
       icon: Shield
     }
   ];
+
   const values = [
     {
       title: "Innovation",
@@ -155,6 +158,7 @@ export default function CareersPage() {
       description: "Our users are at the center of every decision we make."
     }
   ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
       {/* Header */}
@@ -264,7 +268,7 @@ export default function CareersPage() {
           
           <div className="mt-12 text-center">
             <p className="text-slate-600 dark:text-slate-300 mb-6">
-              Don't see a position that fits your skills? We're always looking for talented people.
+              Don&apos;t see a position that fits your skills? We&apos;re always looking for talented people.
             </p>
             <Button variant="outline" size="lg">
               Send Us Your Resume
@@ -344,7 +348,7 @@ export default function CareersPage() {
             Ready to Join Us?
           </h2>
           <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-            We're looking for passionate people to help us revolutionize news consumption.
+            We&apos;re looking for passionate people to help us revolutionize news consumption.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button asChild size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-slate-100">

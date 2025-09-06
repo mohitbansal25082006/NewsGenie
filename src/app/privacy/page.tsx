@@ -17,6 +17,7 @@ import {
   Download
 } from 'lucide-react';
 import Link from 'next/link';
+
 export default function PrivacyPolicyPage() {
   const lastUpdated = "May 15, 2024";
   return (
@@ -126,11 +127,11 @@ export default function PrivacyPolicyPage() {
                 <li><strong>Objection:</strong> You can object to our use of your personal information for certain purposes.</li>
               </ul>
               
-              <h3>Children's Privacy</h3>
+              <h3>Children&apos;s Privacy</h3>
               <p>Our service is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that we have collected personal information from a child under 13, we will take steps to delete it.</p>
               
               <h3>Changes to This Privacy Policy</h3>
-              <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this Privacy Policy periodically for any changes.</p>
+              <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the &quot;Last updated&quot; date. You are advised to review this Privacy Policy periodically for any changes.</p>
               
               <h3>Contact Us</h3>
               <p>If you have any questions about this Privacy Policy, please contact us at:</p>

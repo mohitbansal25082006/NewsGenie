@@ -10,42 +10,49 @@ export interface WebSearchResult {
   source?: string;
 }
 
-interface WebSearchOptions {
-  query: string;
-  type?: 'search' | 'news' | 'images' | 'videos';
-  location?: string;
-  language?: string;
-  num?: number;
-  timeRange?: 'today' | 'week' | 'month' | 'year';
+export interface SearchParams {
+  [key: string]: string | number | boolean | undefined;
 }
 
-// Cache the SerpApi class to avoid repeated import resolution
-let SerpApiClass: any = null;
+export interface SerpApiResponse {
+  organic_results?: Array<Record<string, unknown>>;
+  news_results?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+// Properly typed SerpAPI class reference
+type SerpApiConstructor = new (apiKey: string) => {
+  json: (
+    params: SearchParams,
+    cb?: (data: SerpApiResponse) => void
+  ) => Promise<SerpApiResponse> | void;
+};
+
+// Cache SerpAPI constructor
+let SerpApiClass: SerpApiConstructor | null = null;
 
 /**
  * Safely call SerpAPI's json method (supports both callback-style and promise-style implementations)
  */
-function callSerpApiJson(instance: any, params: any): Promise<any> {
+function callSerpApiJson(
+  instance: { json: (params: SearchParams, cb?: (data: SerpApiResponse) => void) => Promise<SerpApiResponse> | void },
+  params: SearchParams
+): Promise<SerpApiResponse> {
   return new Promise((resolve, reject) => {
     try {
-      // If instance.json supports callback-style: instance.json(params, callback)
       let called = false;
-      const maybe = instance.json(params, (data: any) => {
+      const maybe = instance.json(params, (data: SerpApiResponse) => {
         called = true;
         resolve(data);
       });
 
-      // If instance.json returned a Promise-like object
-      if (!called && maybe && typeof maybe.then === 'function') {
-        maybe.then(resolve).catch(reject);
+      if (!called && maybe && typeof (maybe as Promise<SerpApiResponse>).then === 'function') {
+        (maybe as Promise<SerpApiResponse>).then(resolve).catch(reject);
       } else if (!called && maybe === undefined) {
-        // Some versions may only use callback and we've already handled it above.
-        // If callback wasn't used (because implementation is sync), resolve with maybe.
-        // (edge case)
-        resolve(maybe);
+        resolve({}); // FIX: don’t cast void → SerpApiResponse
       }
-    } catch (err) {
-      reject(err);
+    } catch (error) {
+      reject(error);
     }
   });
 }
@@ -53,34 +60,27 @@ function callSerpApiJson(instance: any, params: any): Promise<any> {
 /**
  * Initialize SerpApi class dynamically. Handles different export shapes.
  */
-async function initializeSerpApi(): Promise<any> {
+async function initializeSerpApi(): Promise<SerpApiConstructor> {
   if (SerpApiClass) return SerpApiClass;
 
-  // Ensure env key exists early
   if (!process.env.SERPAPI_KEY) {
     throw new Error('SerpAPI key is missing. Please add SERPAPI_KEY to your environment variables.');
   }
 
   try {
-    // Use 'any' to avoid TS complaining about shapes of the imported module
-    const serpApiModule: any = await import('google-search-results-nodejs');
+    const serpApiModule: Record<string, unknown> = await import('google-search-results-nodejs');
 
-    // Common export shapes:
-    // 1) module.default -> class
-    // 2) module.GoogleSearch -> constructor function
-    // 3) module.SerpApi -> constructor
-    if (serpApiModule.default && typeof serpApiModule.default === 'function') {
-      SerpApiClass = serpApiModule.default;
-    } else if (serpApiModule.GoogleSearch && typeof serpApiModule.GoogleSearch === 'function') {
-      SerpApiClass = serpApiModule.GoogleSearch;
-    } else if (serpApiModule.SerpApi && typeof serpApiModule.SerpApi === 'function') {
-      SerpApiClass = serpApiModule.SerpApi;
+    if (typeof serpApiModule.default === 'function') {
+      SerpApiClass = serpApiModule.default as SerpApiConstructor;
+    } else if (typeof serpApiModule['GoogleSearch'] === 'function') {
+      SerpApiClass = serpApiModule['GoogleSearch'] as SerpApiConstructor;
+    } else if (typeof serpApiModule['SerpApi'] === 'function') {
+      SerpApiClass = serpApiModule['SerpApi'] as SerpApiConstructor;
     } else {
-      // As a fallback, try to find the first function export (excluding __esModule)
       for (const key in serpApiModule) {
         if (key === '__esModule') continue;
         if (typeof serpApiModule[key] === 'function') {
-          SerpApiClass = serpApiModule[key];
+          SerpApiClass = serpApiModule[key] as SerpApiConstructor;
           break;
         }
       }
@@ -91,9 +91,9 @@ async function initializeSerpApi(): Promise<any> {
     }
 
     return SerpApiClass;
-  } catch (err) {
-    console.error('Failed to import google-search-results-nodejs:', err);
-    throw err;
+  } catch (error) {
+    console.error('Failed to import google-search-results-nodejs:', error);
+    throw error;
   }
 }
 
@@ -172,15 +172,15 @@ export async function searchWeb(
   } = options;
 
   try {
-    let SerpApiConstructor: any;
+    let SerpApiConstructor: SerpApiConstructor;
     try {
       SerpApiConstructor = await initializeSerpApi();
-    } catch (err) {
-      console.warn('SerpAPI not available, returning mock results.', err);
+    } catch (error) {
+      console.warn('SerpAPI not available, returning mock results.', error);
       return getMockSearchResults(query, type, numResults);
     }
 
-    const searchParams: any = {
+    const searchParams: SearchParams = {
       q: query,
       num: numResults
     };
@@ -195,13 +195,11 @@ export async function searchWeb(
     }
 
     if (timeRange) {
-      // SerpAPI expects qdr:d/w/m/y shorthand
       const qdr = timeRange === 'today' ? 'd' : timeRange === 'week' ? 'w' : timeRange === 'month' ? 'm' : 'y';
       searchParams.tbs = `qdr:${qdr}`;
     }
 
-    // instantiate
-    const serpApiInstance = new SerpApiConstructor(process.env.SERPAPI_KEY);
+    const serpApiInstance = new SerpApiConstructor(process.env.SERPAPI_KEY as string);
 
     let results: WebSearchResult[] = [];
 
@@ -209,13 +207,11 @@ export async function searchWeb(
       results = await searchGoogleNews(serpApiInstance, query, searchParams);
     } else {
       const webPromise = searchGoogleWeb(serpApiInstance, query, searchParams);
-      // for news combine smaller number
       const newsParams = { ...searchParams, num: Math.floor(numResults / 2) || 1 };
       const newsPromise = searchGoogleNews(serpApiInstance, query, newsParams);
 
       const [webResults, newsResults] = await Promise.all([webPromise, newsPromise]);
 
-      // combine, dedupe and limit
       const combined = [...webResults, ...newsResults];
       const deduped: WebSearchResult[] = combined.filter((r, i, arr) => {
         return arr.findIndex(x => x.link === r.link) === i;
@@ -224,155 +220,178 @@ export async function searchWeb(
       results = deduped;
     }
 
-    // Enhance snippets by trying to fetch page content if snippet short
     const enhanced = await Promise.all(results.map(async (r) => {
       try {
         if ((!r.snippet || r.snippet.length < 100) && r.link) {
           const content = await extractPageContent(r.link);
           if (content) r.snippet = content;
         }
-      } catch (err) {
+      } catch {
         // ignore enhancement errors
       }
       return r;
     }));
 
     return enhanced;
-  } catch (err) {
-    console.error('searchWeb error:', err);
+  } catch (error) {
+    console.error('searchWeb error:', error);
     return getMockSearchResults(query, options.type || 'comprehensive', options.numResults || 10);
   }
 }
 
 /**
- * Fallback mock search results used when SerpAPI is not available (or for dev)
+ * Fallback mock search results
  */
 function getMockSearchResults(query: string, type: 'news' | 'comprehensive', numResults: number): WebSearchResult[] {
   console.warn('Using mock search results for:', query);
   const results: WebSearchResult[] = [];
   const q = query.toLowerCase();
 
+  const make = (
+    title: string,
+    link: string,
+    snippet: string,
+    source: string,
+    date: string
+  ): WebSearchResult => ({
+    title,
+    link,
+    snippet,
+    source: source || undefined, // FIX: use undefined not null
+    date
+  });
+
   if (q.includes('stock market') || q.includes('stocks')) {
     results.push(
-      {
-        title: "Global Stock Markets Rally as Inflation Data Shows Signs of Cooling",
-        link: "https://www.reuters.com/markets/global-markets-rally-inflation-cooling-2023",
-        snippet: "Major stock indices around the world climbed today as new inflation data suggests that price increases may be slowing, giving investors hope that central banks might ease interest rate hikes.",
-        source: "Reuters",
-        date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        title: "Tech Stocks Lead Gains as AI Companies Report Strong Earnings",
-        link: "https://www.bloomberg.com/tech-stocks-ai-earnings-2023",
-        snippet: "Technology stocks surged today, with companies in the artificial intelligence sector leading the way after several reported better-than-expected quarterly earnings results.",
-        source: "Bloomberg",
-        date: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
-      }
+      make(
+        "Global Stock Markets Rally as Inflation Data Shows Signs of Cooling",
+        "https://www.reuters.com/markets/global-markets-rally-inflation-cooling-2023",
+        "Major stock indices around the world climbed today as new inflation data suggests that price increases may be slowing, giving investors hope that central banks might ease interest rate hikes.",
+        "Reuters",
+        new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+      ),
+      make(
+        "Tech Stocks Lead Gains as AI Companies Report Strong Earnings",
+        "https://www.bloomberg.com/tech-stocks-ai-earnings-2023",
+        "Technology stocks surged today, with companies in the artificial intelligence sector leading the way after several reported better-than-expected quarterly earnings results.",
+        "Bloomberg",
+        new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+      )
     );
   } else if (q.includes('science') || q.includes('scientific')) {
     results.push(
-      {
-        title: "Breakthrough in Quantum Computing Announced by Research Team",
-        link: "https://www.nature.com/articles/quantum-computing-breakthrough-2023",
-        snippet: "Scientists have achieved a major breakthrough in quantum computing, developing a new type of qubit that maintains coherence for significantly longer periods.",
-        source: "Nature",
-        date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-      }
+      make(
+        "Breakthrough in Quantum Computing Announced by Research Team",
+        "https://www.nature.com/articles/quantum-computing-breakthrough-2023",
+        "Scientists have achieved a major breakthrough in quantum computing, developing a new type of qubit that maintains coherence for significantly longer periods.",
+        "Nature",
+        new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+      )
     );
   } else if (q.includes('politics') || q.includes('election')) {
     results.push(
-      {
-        title: "Congress Reaches Last-Minute Deal to Avoid Government Shutdown",
-        link: "https://www.nytimes.com/2023/10/15/us/politics/government-shutdown-deal.html",
-        snippet: "Lawmakers in Congress reached a bipartisan agreement on a temporary funding bill just hours before a potential government shutdown.",
-        source: "The New York Times",
-        date: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-      }
+      make(
+        "Congress Reaches Last-Minute Deal to Avoid Government Shutdown",
+        "https://www.nytimes.com/2023/10/15/us/politics/government-shutdown-deal.html",
+        "Lawmakers in Congress reached a bipartisan agreement on a temporary funding bill just hours before a potential government shutdown.",
+        "The New York Times",
+        new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+      )
     );
   } else {
     results.push(
-      {
-        title: `${query} - Latest Updates and Analysis`,
-        link: `https://www.bbc.com/news/${query.toLowerCase().replace(/\s+/g, '-')}`,
-        snippet: `Comprehensive coverage of the latest developments related to ${query}.`,
-        source: "BBC News",
-        date: new Date().toISOString()
-      },
-      {
-        title: `Breaking News: ${query}`,
-        link: `https://www.cnn.com/${query.toLowerCase().replace(/\s+/g, '-')}`,
-        snippet: `The latest breaking news on ${query}.`,
-        source: "CNN",
-        date: new Date(Date.now() - 60 * 60 * 1000).toISOString()
-      }
+      make(
+        `${query} - Latest Updates and Analysis`,
+        `https://www.bbc.com/news/${query.toLowerCase().replace(/\s+/g, '-')}`,
+        `Comprehensive coverage of the latest developments related to ${query}.`,
+        "BBC News",
+        new Date().toISOString()
+      ),
+      make(
+        `Breaking News: ${query}`,
+        `https://www.cnn.com/${query.toLowerCase().replace(/\s+/g, '-')}`,
+        `The latest breaking news on ${query}.`,
+        "CNN",
+        new Date(Date.now() - 60 * 60 * 1000).toISOString()
+      )
     );
   }
 
   while (results.length < numResults) {
-    results.push({
-      title: `${query} - Additional Information`,
-      link: `https://example.com/news/${query.toLowerCase().replace(/\s+/g, '-')}-${results.length + 1}`,
-      snippet: `More information about ${query} from a comprehensive news coverage.`,
-      source: "News Source",
-      date: new Date(Date.now() - results.length * 60 * 60 * 1000).toISOString()
-    });
+    results.push(
+      make(
+        `${query} - Additional Information`,
+        `https://example.com/news/${query.toLowerCase().replace(/\s+/g, '-')}-${results.length + 1}`,
+        `More information about ${query} from a comprehensive news coverage.`,
+        "News Source",
+        new Date(Date.now() - results.length * 60 * 60 * 1000).toISOString()
+      )
+    );
   }
 
   return results.slice(0, numResults);
 }
 
 /**
- * Search Google Web (organic) results via SerpAPI instance
+ * Search Google Web (organic)
  */
-async function searchGoogleWeb(serpApi: any, query: string, params: any): Promise<WebSearchResult[]> {
+async function searchGoogleWeb(
+  serpApi: { json: (params: SearchParams, cb?: (data: SerpApiResponse) => void) => Promise<SerpApiResponse> | void },
+  query: string,
+  params: SearchParams
+): Promise<WebSearchResult[]> {
   try {
     const response = await callSerpApiJson(serpApi, {
       engine: 'google',
       ...params
     });
 
-    const organic = response?.organic_results || [];
-    return organic.map((r: any) => ({
-      title: r.title || '',
-      link: r.link || '',
-      snippet: r.snippet || '',
-      displayedLink: r.displayed_link || '',
-      date: r.date || '',
-      source: extractSourceFromLink(r.link) || extractSourceFromDisplayedLink(r.displayed_link)
+    const organic = (response?.organic_results ?? []) as Array<Record<string, unknown>>;
+    return organic.map((r) => ({
+      title: (r.title as string) || '',
+      link: (r.link as string) || '',
+      snippet: (r.snippet as string) || '',
+      displayedLink: (r.displayed_link as string) || undefined,
+      date: (r.date as string) || undefined,
+      source: extractSourceFromLink(r.link as string) ?? extractSourceFromDisplayedLink(r.displayed_link as string) ?? undefined
     }));
-  } catch (err) {
-    console.error('Error searching Google Web:', err);
+  } catch (error) {
+    console.error('Error searching Google Web:', error);
     return [];
   }
 }
 
 /**
- * Search Google News via SerpAPI instance
+ * Search Google News
  */
-async function searchGoogleNews(serpApi: any, query: string, params: any): Promise<WebSearchResult[]> {
+async function searchGoogleNews(
+  serpApi: { json: (params: SearchParams, cb?: (data: SerpApiResponse) => void) => Promise<SerpApiResponse> | void },
+  query: string,
+  params: SearchParams
+): Promise<WebSearchResult[]> {
   try {
     const response = await callSerpApiJson(serpApi, {
       engine: 'google_news',
       ...params
     });
 
-    const newsResults = response?.news_results || [];
-    return newsResults.map((r: any) => ({
-      title: r.title || '',
-      link: r.link || '',
-      snippet: r.snippet || '',
-      displayedLink: r.source || r.displayed_link || '',
-      date: r.date || '',
-      source: r.source || extractSourceFromLink(r.link)
+    const newsResults = (response?.news_results ?? []) as Array<Record<string, unknown>>;
+    return newsResults.map((r) => ({
+      title: (r.title as string) || '',
+      link: (r.link as string) || '',
+      snippet: (r.snippet as string) || '',
+      displayedLink: (r.source as string) || (r.displayed_link as string) || undefined,
+      date: (r.date as string) || undefined,
+      source: (r.source as string) || extractSourceFromLink(r.link as string) || undefined
     }));
-  } catch (err) {
-    console.error('Error searching Google News:', err);
+  } catch (error) {
+    console.error('Error searching Google News:', error);
     return [];
   }
 }
 
 /**
- * Try to fetch and extract main textual content from a page (first ~500 chars)
+ * Extract page content
  */
 async function extractPageContent(url: string): Promise<string | null> {
   try {
@@ -398,28 +417,28 @@ async function extractPageContent(url: string): Promise<string | null> {
 
     content = content.replace(/\s+/g, ' ').trim().substring(0, 500);
     return content || null;
-  } catch (err) {
-    console.error(`Error extracting content from ${url}:`, err);
+  } catch (error) {
+    console.error(`Error extracting content from ${url}:`, error);
     return null;
   }
 }
 
-function extractSourceFromLink(url: string): string | null {
+function extractSourceFromLink(url: string): string | undefined {
   try {
-    if (!url) return null;
+    if (!url) return undefined;
     const u = new URL(url);
     const hostname = u.hostname.replace(/^www\./i, '');
     const parts = hostname.split('.');
     if (parts.length > 1) return parts[0];
     return hostname;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
-function extractSourceFromDisplayedLink(displayedLink: string): string | null {
+function extractSourceFromDisplayedLink(displayedLink: string): string | undefined {
   try {
-    if (!displayedLink) return null;
+    if (!displayedLink) return undefined;
     const m = displayedLink.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/i);
     if (m && m[1]) {
       const hostname = m[1];
@@ -427,14 +446,14 @@ function extractSourceFromDisplayedLink(displayedLink: string): string | null {
       if (parts.length > 1) return parts[0];
       return hostname;
     }
-    return null;
+    return undefined;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
 /**
- * Search recent news (hours window)
+ * Search recent news
  */
 export async function searchRecentNews(
   topic: string,
@@ -453,12 +472,12 @@ export async function searchRecentNews(
     location,
     language,
     numResults,
-    timeRange: timeRange as any
+    timeRange
   });
 }
 
 /**
- * Format search results into text lines for AI consumption
+ * Format search results into text lines
  */
 export function formatWebSearchResults(results: WebSearchResult[]): string[] {
   return results.map((result, index) => {
@@ -483,7 +502,7 @@ function formatDate(dateString: string): string {
 }
 
 /**
- * Get page meta information for a URL
+ * Get page meta information
  */
 export async function getUrlInfo(url: string): Promise<{
   title: string;
@@ -543,8 +562,8 @@ export async function getUrlInfo(url: string): Promise<{
       author,
       publishDate
     };
-  } catch (err) {
-    console.error(`Error getting URL info for ${url}:`, err);
+  } catch (error) {
+    console.error(`Error getting URL info for ${url}:`, error);
     return {
       title: '',
       description: ''

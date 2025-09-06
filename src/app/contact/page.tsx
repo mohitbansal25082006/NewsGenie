@@ -6,9 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { 
-  ArrowRight,
-  CheckCircle,
-  Sparkles,
   Mail,
   MapPin,
   Phone,
@@ -21,6 +18,7 @@ import {
   Linkedin
 } from 'lucide-react';
 import Link from 'next/link';
+
 export default function ContactPage() {
   const contactInfo = [
     {
@@ -42,28 +40,14 @@ export default function ContactPage() {
       value: "123 News Street, San Francisco, CA 94105"
     }
   ];
+
   const team = [
-    {
-      name: "Support Team",
-      role: "General Inquiries",
-      email: "support@newsgenie.com"
-    },
-    {
-      name: "Sales Team",
-      role: "Business Partnerships",
-      email: "sales@newsgenie.com"
-    },
-    {
-      name: "Press Team",
-      role: "Media Inquiries",
-      email: "press@newsgenie.com"
-    },
-    {
-      name: "HR Team",
-      role: "Careers & Recruitment",
-      email: "careers@newsgenie.com"
-    }
+    { name: "Support Team", role: "General Inquiries", email: "support@newsgenie.com" },
+    { name: "Sales Team", role: "Business Partnerships", email: "sales@newsgenie.com" },
+    { name: "Press Team", role: "Media Inquiries", email: "press@newsgenie.com" },
+    { name: "HR Team", role: "Careers & Recruitment", email: "careers@newsgenie.com" }
   ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
       {/* Header */}
@@ -80,7 +64,7 @@ export default function ContactPage() {
           </h1>
           
           <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-10 max-w-3xl mx-auto leading-relaxed">
-            We'd love to hear from you. Send us a message and we'll respond as soon as possible.
+            We&apos;d love to hear from you. Send us a message and we&apos;ll respond as soon as possible.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -104,7 +88,7 @@ export default function ContactPage() {
                 <CardHeader>
                   <CardTitle className="text-2xl">Send Us a Message</CardTitle>
                   <CardDescription>
-                    Fill out the form below and we'll get back to you as soon as possible.
+                    Fill out the form below and we&apos;ll get back to you as soon as possible.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -299,7 +283,7 @@ export default function ContactPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-slate-600 dark:text-slate-300">
-                  To reset your password, go to the login page and click on "Forgot Password". Enter your email address and we'll send you instructions to reset your password.
+                  To reset your password, go to the login page and click on &quot;Forgot Password&quot;. Enter your email address and we&apos;ll send you instructions to reset your password.
                 </p>
               </CardContent>
             </Card>
@@ -310,7 +294,7 @@ export default function ContactPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-slate-600 dark:text-slate-300">
-                  You can update your preferences by going to your account settings and selecting "Preferences". From there, you can choose your interests, preferred sources, and notification settings.
+                  You can update your preferences by going to your account settings and selecting &quot;Preferences&quot;. From there, you can choose your interests, preferred sources, and notification settings.
                 </p>
               </CardContent>
             </Card>
@@ -332,7 +316,7 @@ export default function ContactPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-slate-600 dark:text-slate-300">
-                  For partnership inquiries, please contact our sales team at sales@newsgenie.com. We'd love to explore collaboration opportunities.
+                  For partnership inquiries, please contact our sales team at sales@newsgenie.com. We&apos;d love to explore collaboration opportunities.
                 </p>
               </CardContent>
             </Card>

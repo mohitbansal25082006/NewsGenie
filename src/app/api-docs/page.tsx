@@ -41,7 +41,7 @@ export default function ApiDocsPage() {
         { name: "limit", type: "number", description: "Number of articles to return (default: 10)" },
         { name: "page", type: "number", description: "Page number for pagination (default: 1)" }
       ],
-      example: `fetch('/api/news?category=technology&limit=5')
+      example: `fetch(&apos;/api/news?category=technology&limit=5&apos;)
   .then(response => response.json())
   .then(data => console.log(data));`
     },
@@ -54,15 +54,15 @@ export default function ApiDocsPage() {
         { name: "sources", type: "array", description: "Array of preferred news sources" },
         { name: "language", type: "string", description: "Preferred language for news articles" }
       ],
-      example: `fetch('/api/preferences', {
-  method: 'POST',
+      example: `fetch(&apos;/api/preferences&apos;, {
+  method: &apos;POST&apos;,
   headers: {
-    'Content-Type': 'application/json',
+    &apos;Content-Type&apos;: &apos;application/json&apos;,
   },
   body: JSON.stringify({
-    categories: ['technology', 'science'],
-    sources: ['techcrunch', 'wired'],
-    language: 'en'
+    categories: [&apos;technology&apos;, &apos;science&apos;],
+    sources: [&apos;techcrunch&apos;, &apos;wired&apos;],
+    language: &apos;en&apos;
   }),
 })
 .then(response => response.json())
@@ -71,33 +71,33 @@ export default function ApiDocsPage() {
     {
       method: "GET",
       path: "/api/bookmarks",
-      description: "Retrieve user's bookmarked articles",
+      description: "Retrieve user&apos;s bookmarked articles",
       parameters: [
         { name: "limit", type: "number", description: "Number of bookmarks to return (default: 10)" },
         { name: "page", type: "number", description: "Page number for pagination (default: 1)" }
       ],
-      example: `fetch('/api/bookmarks?limit=5')
+      example: `fetch(&apos;/api/bookmarks?limit=5&apos;)
   .then(response => response.json())
   .then(data => console.log(data));`
     },
     {
       method: "POST",
       path: "/api/bookmarks",
-      description: "Add an article to user's bookmarks",
+      description: "Add an article to user&apos;s bookmarks",
       parameters: [
         { name: "articleId", type: "string", description: "ID of the article to bookmark" },
         { name: "title", type: "string", description: "Title of the article" },
         { name: "url", type: "string", description: "URL of the article" }
       ],
-      example: `fetch('/api/bookmarks', {
-  method: 'POST',
+      example: `fetch(&apos;/api/bookmarks&apos;, {
+  method: &apos;POST&apos;,
   headers: {
-    'Content-Type': 'application/json',
+    &apos;Content-Type&apos;: &apos;application/json&apos;,
   },
   body: JSON.stringify({
-    articleId: '12345',
-    title: 'Article Title',
-    url: 'https://example.com/article'
+    articleId: &apos;12345&apos;,
+    title: &apos;Article Title&apos;,
+    url: &apos;https://example.com/article&apos;
   }),
 })
 .then(response => response.json())
@@ -110,19 +110,19 @@ export default function ApiDocsPage() {
       parameters: [
         { name: "period", type: "string", description: "Time period for analytics (day, week, month)" }
       ],
-      example: `fetch('/api/analytics?period=week')
+      example: `fetch(&apos;/api/analytics?period=week&apos;)
   .then(response => response.json())
   .then(data => console.log(data));`
     },
     {
       method: "GET",
       path: "/api/read-articles",
-      description: "Retrieve user's read articles history",
+      description: "Retrieve user&apos;s read articles history",
       parameters: [
         { name: "limit", type: "number", description: "Number of articles to return (default: 10)" },
         { name: "page", type: "number", description: "Page number for pagination (default: 1)" }
       ],
-      example: `fetch('/api/read-articles?limit=5')
+      example: `fetch(&apos;/api/read-articles?limit=5&apos;)
   .then(response => response.json())
   .then(data => console.log(data));`
     }
@@ -143,7 +143,7 @@ export default function ApiDocsPage() {
           </h1>
           
           <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-10 max-w-3xl mx-auto leading-relaxed">
-            Integrate NewsGenie's powerful AI capabilities into your applications with our RESTful API
+            Integrate NewsGenie&apos;s powerful AI capabilities into your applications with our RESTful API
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -230,12 +230,12 @@ export default function ApiDocsPage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Getting Your API Key</h3>
                     <p className="text-slate-600 dark:text-slate-300 mb-4">
-                      To get started, you'll need to generate an API key from your dashboard:
+                      To get started, you&apos;ll need to generate an API key from your dashboard:
                     </p>
                     <ol className="list-decimal pl-5 space-y-2 text-slate-600 dark:text-slate-300">
                       <li>Sign in to your NewsGenie account</li>
                       <li>Navigate to the Dashboard</li>
-                      <li>Click on "API Keys" in the sidebar</li>
+                      <li>Click on &quot;API Keys&quot; in the sidebar</li>
                       <li>Generate a new API key</li>
                     </ol>
                   </div>
@@ -261,9 +261,9 @@ export default function ApiDocsPage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Example Request</h3>
                     <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
-                      <pre>{`fetch('/api/news?category=technology', {
+                      <pre>{`fetch(&apos;/api/news?category=technology&apos;, {
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY'
+    &apos;Authorization&apos;: &apos;Bearer YOUR_API_KEY&apos;
   }
 })
 .then(response => response.json())
@@ -517,13 +517,13 @@ export default function ApiDocsPage() {
                       
                       <TabsContent value="javascript" className="mt-4">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
-                          <pre>{`import { NewsGenie } from 'newsgenie-js';
+                          <pre>{`import { NewsGenie } from &apos;newsgenie-js&apos;;
 const client = new NewsGenie({
-  apiKey: 'YOUR_API_KEY'
+  apiKey: &apos;YOUR_API_KEY&apos;
 });
 // Fetch technology news
 const articles = await client.news.get({
-  category: 'technology',
+  category: &apos;technology&apos;,
   limit: 10
 });
 console.log(articles);`}</pre>
@@ -559,10 +559,10 @@ console.log(articles);` ? <CheckCircle className="h-4 w-4" /> : <Copy className=
                       <TabsContent value="python" className="mt-4">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
                           <pre>{`import newsgenie
-client = newsgenie.NewsGenie(api_key='YOUR_API_KEY')
+client = newsgenie.NewsGenie(api_key=&apos;YOUR_API_KEY&apos;)
 # Fetch technology news
 articles = client.news.get(
-    category='technology',
+    category=&apos;technology&apos;,
     limit=10
 )
 print(articles)`}</pre>
@@ -593,11 +593,11 @@ print(articles)` ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-
                       
                       <TabsContent value="ruby" className="mt-4">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
-                          <pre>{`require 'newsgenie'
-client = NewsGenie::Client.new(api_key: 'YOUR_API_KEY')
+                          <pre>{`require &apos;newsgenie&apos;
+client = NewsGenie::Client.new(api_key: &apos;YOUR_API_KEY&apos;)
 # Fetch technology news
 articles = client.news.get(
-  category: 'technology',
+  category: &apos;technology&apos;,
   limit: 10
 )
 puts articles`}</pre>
@@ -629,11 +629,11 @@ puts articles` ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4"
                       <TabsContent value="php" className="mt-4">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
                           <pre>{`use NewsGenie\\Client;
-$client = new Client('YOUR_API_KEY');
+$client = new Client(&apos;YOUR_API_KEY&apos;);
 // Fetch technology news
 $articles = $client->news()->get([
-    'category' => 'technology',
-    'limit' => 10
+    &apos;category&apos; => &apos;technology&apos;,
+    &apos;limit&apos; => 10
 ]);
 print_r($articles);`}</pre>
                           <Button 
@@ -675,15 +675,15 @@ print_r($articles);` ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-
                       
                       <TabsContent value="javascript" className="mt-4">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
-                          <pre>{`import { NewsGenie } from 'newsgenie-js';
+                          <pre>{`import { NewsGenie } from &apos;newsgenie-js&apos;;
 const client = new NewsGenie({
-  apiKey: 'YOUR_API_KEY'
+  apiKey: &apos;YOUR_API_KEY&apos;
 });
 // Update user preferences
 const preferences = await client.preferences.update({
-  categories: ['technology', 'science'],
-  sources: ['techcrunch', 'wired'],
-  language: 'en'
+  categories: [&apos;technology&apos;, &apos;science&apos;],
+  sources: [&apos;techcrunch&apos;, &apos;wired&apos;],
+  language: &apos;en&apos;
 });
 console.log(preferences);`}</pre>
                           <Button 
@@ -720,12 +720,12 @@ console.log(preferences);` ? <CheckCircle className="h-4 w-4" /> : <Copy classNa
                       <TabsContent value="python" className="mt-4">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
                           <pre>{`import newsgenie
-client = newsgenie.NewsGenie(api_key='YOUR_API_KEY')
+client = newsgenie.NewsGenie(api_key=&apos;YOUR_API_KEY&apos;)
 # Update user preferences
 preferences = client.preferences.update(
-    categories=['technology', 'science'],
-    sources=['techcrunch', 'wired'],
-    language='en'
+    categories=[&apos;technology&apos;, &apos;science&apos;],
+    sources=[&apos;techcrunch&apos;, &apos;wired&apos;],
+    language=&apos;en&apos;
 )
 print(preferences)`}</pre>
                           <Button 
@@ -757,13 +757,13 @@ print(preferences)` ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4
                       
                       <TabsContent value="ruby" className="mt-4">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
-                          <pre>{`require 'newsgenie'
-client = NewsGenie::Client.new(api_key: 'YOUR_API_KEY')
+                          <pre>{`require &apos;newsgenie&apos;
+client = NewsGenie::Client.new(api_key: &apos;YOUR_API_KEY&apos;)
 # Update user preferences
 preferences = client.preferences.update(
-  categories: ['technology', 'science'],
-  sources: ['techcrunch', 'wired'],
-  language: 'en'
+  categories: [&apos;technology&apos;, &apos;science&apos;],
+  sources: [&apos;techcrunch&apos;, &apos;wired&apos;],
+  language: &apos;en&apos;
 )
 puts preferences`}</pre>
                           <Button 
@@ -796,12 +796,12 @@ puts preferences` ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w
                       <TabsContent value="php" className="mt-4">
                         <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 font-mono text-sm relative">
                           <pre>{`use NewsGenie\\Client;
-$client = new Client('YOUR_API_KEY');
+$client = new Client(&apos;YOUR_API_KEY&apos;);
 // Update user preferences
 $preferences = $client->preferences()->update([
-    'categories' => ['technology', 'science'],
-    'sources' => ['techcrunch', 'wired'],
-    'language' => 'en'
+    &apos;categories&apos; => [&apos;technology&apos;, &apos;science&apos;],
+    &apos;sources&apos; => [&apos;techcrunch&apos;, &apos;wired&apos;],
+    &apos;language&apos; => &apos;en&apos;
 ]);
 print_r($preferences);`}</pre>
                           <Button 

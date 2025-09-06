@@ -49,10 +49,10 @@ export default function DocsPage() {
     },
     {
       title: "Personalization Guide",
-      description: "Learn how to get the most out of NewsGenie's personalization features",
+      description: "Learn how to get the most out of NewsGenie&apos;s personalization features",
       icon: Users,
       color: "purple",
-      content: `NewsGenie's AI learns from your reading habits to deliver increasingly relevant content. Here's how to optimize your experience:
+      content: `NewsGenie&apos;s AI learns from your reading habits to deliver increasingly relevant content. Here&apos;s how to optimize your experience:
 1. **Rate Articles**: Use the thumbs up/down buttons to provide feedback on article relevance.
 2. **Update Interests**: Regularly review and update your interest categories.
 3. **Bookmark Important Articles**: Save articles you want to reference later.
@@ -60,10 +60,10 @@ export default function DocsPage() {
     },
     {
       title: "AI Features Guide",
-      description: "Discover how to leverage NewsGenie's advanced AI capabilities",
+      description: "Discover how to leverage NewsGenie&apos;s advanced AI capabilities",
       icon: Brain,
       color: "green",
-      content: `NewsGenie's AI features transform how you consume news:
+      content: `NewsGenie&apos;s AI features transform how you consume news:
 1. **Article Summaries**: Toggle between full articles and AI-generated summaries.
 2. **Sentiment Analysis**: View sentiment scores to understand the emotional tone of articles.
 3. **Topic Clustering**: Explore related articles grouped by topic.
@@ -106,7 +106,7 @@ export default function DocsPage() {
           </h1>
           
           <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-10 max-w-3xl mx-auto leading-relaxed">
-            Everything you need to know to get the most out of NewsGenie's AI-powered news platform
+            Everything you need to know to get the most out of NewsGenie&apos;s AI-powered news platform
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -182,7 +182,7 @@ export default function DocsPage() {
                       AI-Powered Features
                     </CardTitle>
                     <CardDescription>
-                      Learn about NewsGenie's advanced AI capabilities
+                      Learn about NewsGenie&apos;s advanced AI capabilities
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -196,7 +196,7 @@ export default function DocsPage() {
                           <h4 className="font-medium mb-2">How to use:</h4>
                           <ol className="list-decimal pl-5 space-y-1 text-sm">
                             <li>Open any article in your feed</li>
-                            <li>Click the "Summary" toggle button</li>
+                            <li>Click the &quot;Summary&quot; toggle button</li>
                             <li>View the AI-generated summary</li>
                           </ol>
                         </div>
@@ -226,7 +226,7 @@ export default function DocsPage() {
                           <h4 className="font-medium mb-2">Finding related articles:</h4>
                           <ol className="list-decimal pl-5 space-y-1 text-sm">
                             <li>Open an article</li>
-                            <li>Scroll to the "Related Articles" section</li>
+                            <li>Scroll to the &quot;Related Articles&quot; section</li>
                             <li>Click on any article to explore</li>
                           </ol>
                         </div>
@@ -241,7 +241,7 @@ export default function DocsPage() {
                           <h4 className="font-medium mb-2">Viewing trends:</h4>
                           <ol className="list-decimal pl-5 space-y-1 text-sm">
                             <li>Navigate to your Dashboard</li>
-                            <li>Click on the "Trends" tab</li>
+                            <li>Click on the &quot;Trends&quot; tab</li>
                             <li>Explore trending topics by category</li>
                           </ol>
                         </div>
@@ -339,7 +339,7 @@ export default function DocsPage() {
                     API Reference
                   </CardTitle>
                   <CardDescription>
-                    Technical documentation for NewsGenie's API
+                    Technical documentation for NewsGenie&apos;s API
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -404,7 +404,7 @@ export default function DocsPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-2">How do I report an issue or provide feedback?</h3>
                       <p className="text-slate-600 dark:text-slate-300">
-                        We welcome your feedback! You can report issues or share suggestions through the "Feedback" option in your account settings, or by contacting our support team directly at support@newsgenie.com.
+                        We welcome your feedback! You can report issues or share suggestions through the &quot;Feedback&quot; option in your account settings, or by contacting our support team directly at support@newsgenie.com.
                       </p>
                     </div>
                   </div>
