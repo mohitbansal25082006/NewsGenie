@@ -933,15 +933,6 @@ SOFTWARE.
 - **News API** for providing comprehensive news data
 - All contributors and users who have helped improve NewsGenie
 
-## 📞 Support
-
-If you encounter any issues or have questions:
-
-1. **Check the Documentation**: Make sure to read through this README thoroughly
-2. **Search Existing Issues**: Check if your question has been asked before
-3. **Create a New Issue**: If you can't find an answer, create a new issue on GitHub
-4. **Join Our Community**: Connect with other users and developers
-
 <div align="center">
   
 **Made with ❤️ by Mohit Bansal**
