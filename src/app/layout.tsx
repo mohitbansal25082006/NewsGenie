@@ -110,16 +110,13 @@ export default async function RootLayout({
                       AI Chat
                     </Link>
                   </>
-                ) : (
-                  <>
-                    
-                  </>
-                )}
+                ) : null}
               </div>
 
               {/* Right side: Notifications and User Menu */}
               <div className="flex items-center space-x-2 mt-2 md:mt-0">
                 {session && <NotificationBadge />}
+                {/* Always render UserMenu */}
                 <UserMenu />
               </div>
             </nav>

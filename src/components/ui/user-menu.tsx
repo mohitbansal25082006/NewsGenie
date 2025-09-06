@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 export function UserMenu() {
   const { data: session } = useSession();
-  
+
   const handleSignIn = async (provider: string) => {
     try {
       await signIn(provider, { callbackUrl: "/dashboard" });
@@ -25,89 +25,83 @@ export function UserMenu() {
       toast.error("Failed to sign in. Please try again.");
     }
   };
-  
-  if (!session) {
-    return (
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handleSignIn("google")}
-          className="flex items-center gap-2"
-        >
-          <Chrome className="h-4 w-4" />
-          Google
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => handleSignIn("github")}
-          className="flex items-center gap-2"
-        >
-          <Github className="h-4 w-4" />
-          GitHub
-        </Button>
-      </div>
-    );
-  }
-  
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={session.user.image || ""} alt={session.user.name || ""} />
-            <AvatarFallback>
-              {session.user.name?.charAt(0).toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-        </Button>
+        {session ? (
+          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={session.user.image || ""} alt={session.user.name || ""} />
+              <AvatarFallback>
+                {session.user.name?.charAt(0).toUpperCase() || "U"}
+              </AvatarFallback>
+            </Avatar>
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm">
+            Sign In
+          </Button>
+        )}
       </DropdownMenuTrigger>
+
       <DropdownMenuContent className="w-56" align="end" forceMount>
-        <div className="flex items-center justify-start gap-2 p-2">
-          <div className="flex flex-col space-y-1 leading-none">
-            {session.user.name && (
-              <p className="font-medium">{session.user.name}</p>
-            )}
-            {session.user.email && (
-              <p className="w-[200px] truncate text-sm text-muted-foreground">
-                {session.user.email}
-              </p>
-            )}
-          </div>
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/dashboard">
-            <User className="mr-2 h-4 w-4" />
-            <span>Dashboard</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/chat">
-            <MessageSquare className="mr-2 h-4 w-4" />
-            <span>AI Chat</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/dashboard/notifications">
-            <Bell className="mr-2 h-4 w-4" />
-            <span>Notifications</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/dashboard/preferences">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Preferences</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => signOut({ callbackUrl: "/" })}
-          className="cursor-pointer"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Sign out</span>
-        </DropdownMenuItem>
+        {session ? (
+          <>
+            <div className="flex items-center justify-start gap-2 p-2">
+              <div className="flex flex-col space-y-1 leading-none">
+                {session.user.name && <p className="font-medium">{session.user.name}</p>}
+                {session.user.email && (
+                  <p className="w-[200px] truncate text-sm text-muted-foreground">{session.user.email}</p>
+                )}
+              </div>
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard">
+                <User className="mr-2 h-4 w-4" />
+                <span>Dashboard</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/chat">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                <span>AI Chat</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/notifications">
+                <Bell className="mr-2 h-4 w-4" />
+                <span>Notifications</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/preferences">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Preferences</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="cursor-pointer"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sign out</span>
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem onClick={() => handleSignIn("google")} className="flex items-center gap-2 cursor-pointer">
+              <Chrome className="h-4 w-4" />
+              <span>Sign in with Google</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleSignIn("github")} className="flex items-center gap-2 cursor-pointer">
+              <Github className="h-4 w-4" />
+              <span>Sign in with GitHub</span>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
