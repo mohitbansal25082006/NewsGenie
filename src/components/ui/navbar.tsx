@@ -7,8 +7,13 @@ import { UserMenu } from "@/components/ui/user-menu";
 import Image from "next/image";
 import { Menu } from "lucide-react";
 import { useState } from "react";
+import type { Session } from "next-auth";
 
-export default function Navbar({ session }: { session: any }) {
+interface NavbarProps {
+  session: Session | null;
+}
+
+export default function Navbar({ session }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -33,7 +38,10 @@ export default function Navbar({ session }: { session: any }) {
         {/* Desktop Nav */}
         {session && (
           <div className="hidden md:flex gap-6">
-            <Link href="/" className="text-gray-700 hover:text-blue-600 transition">
+            <Link
+              href="/"
+              className="text-gray-700 hover:text-blue-600 transition"
+            >
               Home
             </Link>
             <Link
