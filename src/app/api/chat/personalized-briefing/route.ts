@@ -55,6 +55,7 @@ interface BriefingRequest {
   forceRefresh?: boolean;
   timeRange?: 'today' | 'week' | 'month' | 'quarter';
   categories?: string[];
+  format?: 'json' | 'html' | 'markdown';
 }
 
 /**
@@ -78,28 +79,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user preferences
     const user = await db.user.findUnique({
-      where: {
-        id: session.user.id,
-      },
-      include: {
-        userPreference: true,
-      },
+      where: { id: session.user.id },
+      include: { userPreference: true },
     });
 
     if (!user || !user.userPreference) {
       return NextResponse.json({ error: 'User preferences not found' }, { status: 404 });
     }
 
-    // Parse query parameters
     const { searchParams } = new URL(request.url);
     const webSearchEnabled = searchParams.get('webSearch') === 'true';
     const timeRange =
       (searchParams.get('timeRange') as 'today' | 'week' | 'month' | 'quarter') || 'week';
     const forceRefresh = searchParams.get('forceRefresh') === 'true';
+    const format = (searchParams.get('format') as 'json' | 'html' | 'markdown') || 'json';
 
-    // Generate personalized briefing
     const briefing = await generatePersonalizedBriefingInternal(
       user,
       webSearchEnabled,
@@ -107,7 +102,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       forceRefresh
     );
 
-    return NextResponse.json(briefing);
+    if (format === 'html') {
+      return formatBriefingAsHtml(briefing);
+    } else if (format === 'markdown') {
+      return formatBriefingAsMarkdown(briefing);
+    } else {
+      return NextResponse.json(briefing);
+    }
   } catch (error) {
     console.error('Error creating personalized briefing:', error);
     return NextResponse.json({ error: 'Failed to create personalized briefing' }, { status: 500 });
@@ -122,23 +123,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const body = (await request.json()) as BriefingRequest;
-    const { webSearchEnabled = true, forceRefresh = false, timeRange = 'week', categories } = body;
+    const { webSearchEnabled = true, forceRefresh = false, timeRange = 'week', categories, format = 'json' } = body;
 
-    // Get user preferences
     const user = await db.user.findUnique({
-      where: {
-        id: session.user.id,
-      },
-      include: {
-        userPreference: true,
-      },
+      where: { id: session.user.id },
+      include: { userPreference: true },
     });
 
     if (!user || !user.userPreference) {
       return NextResponse.json({ error: 'User preferences not found' }, { status: 404 });
     }
 
-    // Generate personalized briefing
     const briefing = await generatePersonalizedBriefingInternal(
       user,
       webSearchEnabled,
@@ -147,11 +142,160 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       categories
     );
 
-    return NextResponse.json(briefing);
+    if (format === 'html') {
+      return formatBriefingAsHtml(briefing);
+    } else if (format === 'markdown') {
+      return formatBriefingAsMarkdown(briefing);
+    } else {
+      return NextResponse.json(briefing);
+    }
   } catch (error) {
     console.error('Error creating personalized briefing:', error);
     return NextResponse.json({ error: 'Failed to create personalized briefing' }, { status: 500 });
   }
+}
+
+/**
+ * Format briefing as HTML
+ */
+function formatBriefingAsHtml(briefingResp: BriefingResponse): NextResponse {
+  const {
+    briefing: briefingText,
+    articlesCount,
+    latestArticleDate,
+    generatedAt,
+    timeRange,
+    categories,
+    sources,
+  } = briefingResp;
+
+  const formattedDate = latestArticleDate
+    ? new Date(latestArticleDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'Not available';
+
+  const generatedAtFormatted = new Date(generatedAt).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const timeRangeFormatted = timeRange.charAt(0).toUpperCase() + timeRange.slice(1);
+
+  let formattedBriefing = briefingText
+    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^- (.*$)/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*<\/li>)/, '<ul>$1</ul>') // ✅ fixed regex
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(.*)$/gm, '<p>$1</p>');
+
+  formattedBriefing = formattedBriefing.replace(/<p><\/p>/g, '');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Personalized News Briefing</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f9fafb;
+    }
+    .container { background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 30px; }
+    .title { font-size: 28px; font-weight: 700; color: #1e40af; }
+    h1,h2,h3 { color: #1e40af; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">Personalized News Briefing</h1>
+    <p><strong>Generated on:</strong> ${generatedAtFormatted}</p>
+    <p><strong>Time range:</strong> ${timeRangeFormatted}</p>
+    <p><strong>Articles:</strong> ${articlesCount}</p>
+    <p><strong>Sources:</strong> ${sources.length}</p>
+    ${latestArticleDate ? `<p><strong>Latest:</strong> ${formattedDate}</p>` : ''}
+    <div>${categories.map(cat => `<span>[${cat}]</span>`).join(' ')}</div>
+    <div>${formattedBriefing}</div>
+  </div>
+</body>
+</html>
+  `;
+
+  return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
+}
+
+/**
+ * Format briefing as Markdown
+ */
+function formatBriefingAsMarkdown(briefingResp: BriefingResponse): NextResponse {
+  const {
+    briefing: briefingText,
+    articlesCount,
+    latestArticleDate,
+    generatedAt,
+    timeRange,
+    categories,
+    sources,
+  } = briefingResp;
+
+  const formattedDate = latestArticleDate
+    ? new Date(latestArticleDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'Not available';
+
+  const generatedAtFormatted = new Date(generatedAt).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const timeRangeFormatted = timeRange.charAt(0).toUpperCase() + timeRange.slice(1);
+
+  const categoriesList = categories.map((cat) => `- ${cat}`).join('\n  ');
+
+  const markdown = `# Personalized News Briefing
+
+---
+
+**Generated on:** ${generatedAtFormatted}  
+**Time range:** ${timeRangeFormatted}  
+**Articles:** ${articlesCount}  
+**Sources:** ${sources.length}  
+${latestArticleDate ? `**Latest article:** ${formattedDate}\n` : ''}
+
+**Categories:**  
+  ${categoriesList}
+
+---
+
+${briefingText}
+
+---
+
+*This briefing was generated by NewsGenie AI based on your interests and reading history.*`;
+
+  return new NextResponse(markdown, { headers: { 'Content-Type': 'text/markdown' } });
 }
 
 /**
@@ -164,15 +308,9 @@ async function generatePersonalizedBriefingInternal(
   forceRefresh: boolean = false,
   customCategories?: string[]
 ): Promise<BriefingResponse> {
-  // Ensure categories always available (fix for catch block)
   let categories: string[] = [];
 
   try {
-    console.log(
-      `Generating personalized briefing for user ${user.id} (web search: ${webSearchEnabled}, time range: ${timeRange})`
-    );
-
-    // Build categories from user interests or custom categories
     const interests =
       Array.isArray(user.userPreference.interests) && user.userPreference.interests.length > 0
         ? user.userPreference.interests
@@ -190,7 +328,6 @@ async function generatePersonalizedBriefingInternal(
     let webSearchResults: WebSearchResult[] = [];
     let allSources: string[] = [];
 
-    // Helper to safely map NewsAPI article to our ProcessedArticle
     const mapArticle = (a: NewsApiArticle, category: string): ProcessedArticle => ({
       title: a.title ?? '',
       description: a.description ?? null,
@@ -201,25 +338,15 @@ async function generatePersonalizedBriefingInternal(
       category,
     });
 
-    // Calculate date range for filtering
     const now = new Date();
     const startDate = new Date();
     switch (timeRange) {
-      case 'today':
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'week':
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case 'month':
-        startDate.setMonth(now.getMonth() - 1);
-        break;
-      case 'quarter':
-        startDate.setMonth(now.getMonth() - 3);
-        break;
+      case 'today': startDate.setHours(0, 0, 0, 0); break;
+      case 'week': startDate.setDate(now.getDate() - 7); break;
+      case 'month': startDate.setMonth(now.getMonth() - 1); break;
+      case 'quarter': startDate.setMonth(now.getMonth() - 3); break;
     }
 
-    // Fetch articles by category
     for (const category of categories) {
       try {
         const response = (await newsApi.getTopHeadlines({
@@ -232,8 +359,7 @@ async function generatePersonalizedBriefingInternal(
           const processed = response.articles
             .filter((article) => {
               if (!article.publishedAt) return true;
-              const articleDate = new Date(article.publishedAt);
-              return articleDate >= startDate;
+              return new Date(article.publishedAt) >= startDate;
             })
             .map((article) => mapArticle(article, category));
           allArticles.push(...processed);
@@ -243,7 +369,6 @@ async function generatePersonalizedBriefingInternal(
       }
     }
 
-    // If not enough articles, fetch broader "everything" query
     if (allArticles.length < 10) {
       try {
         const query =
@@ -263,8 +388,7 @@ async function generatePersonalizedBriefingInternal(
           const processed = response.articles
             .filter((article) => {
               if (!article.publishedAt) return true;
-              const articleDate = new Date(article.publishedAt);
-              return articleDate >= startDate;
+              return new Date(article.publishedAt) >= startDate;
             })
             .map((article) => mapArticle(article, 'general'));
 
@@ -279,7 +403,6 @@ async function generatePersonalizedBriefingInternal(
       }
     }
 
-    // Perform web search if enabled
     if (webSearchEnabled) {
       try {
         const searchQuery =
@@ -287,26 +410,12 @@ async function generatePersonalizedBriefingInternal(
             ? `latest ${interests.slice(0, 3).join(', ')} news`
             : 'latest news developments';
 
-        console.log('Performing web search for briefing:', searchQuery);
-
-        // Map our timeRange to what searchWeb expects
         let searchTimeRange: 'today' | 'week' | 'month' | 'year' | undefined;
         switch (timeRange) {
-          case 'today':
-            searchTimeRange = 'today';
-            break;
-          case 'week':
-            searchTimeRange = 'week';
-            break;
-          case 'month':
-            searchTimeRange = 'month';
-            break;
-          case 'quarter':
-            // For quarter, use month as the closest approximation
-            searchTimeRange = 'month';
-            break;
-          default:
-            searchTimeRange = 'week';
+          case 'today': searchTimeRange = 'today'; break;
+          case 'week': searchTimeRange = 'week'; break;
+          case 'month': searchTimeRange = 'month'; break;
+          case 'quarter': searchTimeRange = 'month'; break;
         }
 
         const searchResults = await searchWeb(searchQuery, {
@@ -319,11 +428,8 @@ async function generatePersonalizedBriefingInternal(
 
         if (searchResults && searchResults.length > 0) {
           webSearchResults = searchResults;
-
           const webSources = searchResults.map((r) => r.link).filter((link): link is string => Boolean(link));
           allSources.push(...webSources);
-
-          console.log(`Web search returned ${searchResults.length} results`);
         }
       } catch (error) {
         console.error('Web search failed for briefing:', error);
@@ -371,7 +477,6 @@ async function generatePersonalizedBriefingInternal(
     };
   } catch (error) {
     console.error('Error in generatePersonalizedBriefingInternal:', error);
-
     return {
       briefing: `I apologize, but I'm currently unable to generate your personalized briefing.`,
       articlesCount: 0,
