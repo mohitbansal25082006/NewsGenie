@@ -1,15 +1,16 @@
 // E:\newsgenie\src\app\layout.tsx
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import { Providers } from "@/components/providers"
-import Link from "next/link"
-import { NotificationBadge } from "@/components/ui/notification-badge"
-import { UserMenu } from "@/components/ui/user-menu"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Providers } from "@/components/providers";
+import Link from "next/link";
+import { NotificationBadge } from "@/components/ui/notification-badge";
+import { UserMenu } from "@/components/ui/user-menu";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import Image from "next/image";
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "NewsGenie - AI-Powered News Aggregator",
@@ -22,14 +23,14 @@ export const metadata: Metadata = {
     description: "Stay informed with personalized, AI-curated news",
     type: "website",
   },
-}
+};
 
 export default async function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions)
+  const session = await getServerSession(authOptions);
   
   return (
     <html lang="en" className="scroll-smooth">
@@ -39,8 +40,19 @@ export default async function RootLayout({
           <header className="w-full border-b bg-white shadow-sm sticky top-0 z-50">
             <nav className="container mx-auto flex items-center justify-between p-4">
               {/* Logo / Brand */}
-              <div className="text-xl font-bold text-blue-600">
-                NewsGenie
+              <div className="flex items-center space-x-3">
+                <div className="bg-blue-600 p-1 rounded-lg">
+                  <Image 
+                    src="/logo.png" 
+                    alt="NewsGenie AI Logo" 
+                    width={32}
+                    height={32}
+                    className="rounded-md"
+                  />
+                </div>
+                <div className="text-xl font-bold text-blue-600">
+                  NewsGenie
+                </div>
               </div>
               
               {/* Nav Links */}
@@ -82,5 +94,5 @@ export default async function RootLayout({
         </Providers>
       </body>
     </html>
-  )
+  );
 }
