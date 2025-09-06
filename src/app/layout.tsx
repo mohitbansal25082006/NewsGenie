@@ -41,16 +41,18 @@ export default async function RootLayout({
             <nav className="container mx-auto flex items-center justify-between p-4">
               {/* Logo / Brand */}
               <div className="flex items-center space-x-3">
-                <Image
-                  src="/logo.png"
-                  alt="NewsGenie AI Logo"
-                  width={32}
-                  height={32}
-                  className="rounded-md"
-                />
-                <div className="text-xl font-bold text-blue-600">
-                  NewsGenie
-                </div>
+                <Link href="/" className="flex items-center space-x-3">
+                  <Image
+                    src="/logo.png"
+                    alt="NewsGenie AI Logo"
+                    width={64}
+                    height={64}
+                    className="rounded-md"
+                  />
+                  <div className="text-3xl font-bold text-blue-600">
+                    NewsGenie
+                  </div>
+                </Link>
               </div>
 
               {/* Nav Links */}
