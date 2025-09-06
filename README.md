@@ -13,6 +13,8 @@
 
 </div>
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-NewsGenie-blue?style=for-the-badge&logo=vercel)](https://newsgenie-psi.vercel.app/)
+
 ## 📖 Table of Contents
 
 - [🌟 About](#-about)
