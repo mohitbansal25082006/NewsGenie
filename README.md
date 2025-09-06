@@ -1,6 +1,6 @@
 # NewsGenie - AI-Powered News Aggregator
 
-![NewsGenie Banner](https://via.placeholder.com/1200x400?text=NewsGenie+-+AI-Powered+News+Aggregator)
+![NewsGenie Banner](./banner.png)
 
 <div align="center">
   
