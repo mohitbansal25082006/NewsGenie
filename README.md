@@ -942,20 +942,8 @@ If you encounter any issues or have questions:
 3. **Create a New Issue**: If you can't find an answer, create a new issue on GitHub
 4. **Join Our Community**: Connect with other users and developers
 
-### Contact Information
-
-- **GitHub Issues**: [Create an issue](https://github.com/your-username/newsgenie/issues)
-- **Email**: support@newsgenie.com
-- **Discord**: [Join our Discord server](https://discord.gg/newsgenie)
-
----
-
 <div align="center">
   
-**Made with ❤️ by the NewsGenie Team**
-
-[![Website](https://img.shields.io/badge/Website-Visit-blue?style=flat&logo=vercel&logoColor=white)](https://newsgenie.com)
-[![Twitter](https://img.shields.io/badge/Twitter-Follow-blue?style=flat&logo=twitter&logoColor=white)](https://twitter.com/newsgenie)
-[![Discord](https://img.shields.io/badge/Discord-Join-purple?style=flat&logo=discord&logoColor=white)](https://discord.gg/newsgenie)
+**Made with ❤️ by Mohit Bansal**
 
 </div>
