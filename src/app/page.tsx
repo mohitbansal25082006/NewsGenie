@@ -1,4 +1,4 @@
-// E:\newsgenie\src\app\page.tsx
+// src/app/page.tsx
 'use client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -710,29 +710,29 @@ export default function HomePage() {
             <div>
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                <li><a href="#features" className="hover:text-blue-600 transition-colors">Features</a></li>
-                <li><a href="#how-it-works" className="hover:text-blue-600 transition-colors">How It Works</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition-colors">API</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition-colors">Documentation</a></li>
+                <li><Link href="/features" className="hover:text-blue-600 transition-colors">Features</Link></li>
+                <li><Link href="/how-it-works" className="hover:text-blue-600 transition-colors">How It Works</Link></li>
+                <li><Link href="/api-docs" className="hover:text-blue-600 transition-colors">API</Link></li>
+                <li><Link href="/docs" className="hover:text-blue-600 transition-colors">Documentation</Link></li>
               </ul>
             </div>
             
             <div>
               <h3 className="font-semibold mb-4">Company</h3>
               <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                <li><a href="#" className="hover:text-blue-600 transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition-colors">Contact</a></li>
+                <li><Link href="/about" className="hover:text-blue-600 transition-colors">About</Link></li>
+                <li><Link href="/blog" className="hover:text-blue-600 transition-colors">Blog</Link></li>
+                <li><Link href="/careers" className="hover:text-blue-600 transition-colors">Careers</Link></li>
+                <li><Link href="/contact" className="hover:text-blue-600 transition-colors">Contact</Link></li>
               </ul>
             </div>
             
             <div>
               <h3 className="font-semibold mb-4">Legal</h3>
               <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                <li><a href="#" className="hover:text-blue-600 transition-colors">Privacy</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition-colors">Terms</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition-colors">Security</a></li>
+                <li><Link href="/privacy" className="hover:text-blue-600 transition-colors">Privacy</Link></li>
+                <li><Link href="/terms" className="hover:text-blue-600 transition-colors">Terms</Link></li>
+                <li><Link href="/security" className="hover:text-blue-600 transition-colors">Security</Link></li>
               </ul>
             </div>
           </div>
