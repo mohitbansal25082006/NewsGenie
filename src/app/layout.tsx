@@ -31,7 +31,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
-  
+
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.className} antialiased`}>
@@ -41,20 +41,18 @@ export default async function RootLayout({
             <nav className="container mx-auto flex items-center justify-between p-4">
               {/* Logo / Brand */}
               <div className="flex items-center space-x-3">
-                <div className="bg-blue-600 p-1 rounded-lg">
-                  <Image 
-                    src="/logo.png" 
-                    alt="NewsGenie AI Logo" 
-                    width={32}
-                    height={32}
-                    className="rounded-md"
-                  />
-                </div>
+                <Image
+                  src="/logo.png"
+                  alt="NewsGenie AI Logo"
+                  width={32}
+                  height={32}
+                  className="rounded-md"
+                />
                 <div className="text-xl font-bold text-blue-600">
                   NewsGenie
                 </div>
               </div>
-              
+
               {/* Nav Links */}
               <div className="flex gap-6">
                 {session && (
@@ -80,7 +78,7 @@ export default async function RootLayout({
                   </>
                 )}
               </div>
-              
+
               {/* Right side: Notifications and User Menu */}
               <div className="flex items-center space-x-2">
                 {session && <NotificationBadge />}
@@ -88,7 +86,7 @@ export default async function RootLayout({
               </div>
             </nav>
           </header>
-          
+
           {/* Page Content */}
           <main className="container mx-auto p-6">{children}</main>
         </Providers>
