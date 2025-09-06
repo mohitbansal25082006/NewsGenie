@@ -9,6 +9,7 @@ import { UserMenu } from "@/components/ui/user-menu";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import Image from "next/image";
+import { Menu } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,52 +46,95 @@ export default async function RootLayout({
                   <Image
                     src="/logo.png"
                     alt="NewsGenie AI Logo"
-                    width={64}
-                    height={64}
-                    className="rounded-md"
+                    width={72}
+                    height={72}
+                    className="rounded-md w-12 h-12 sm:w-16 sm:h-16"
                   />
-                  <div className="text-3xl font-bold text-blue-600">
+                  <div className="text-2xl sm:text-3xl font-bold text-blue-600">
                     NewsGenie
                   </div>
                 </Link>
               </div>
 
-              {/* Nav Links */}
-              <div className="flex gap-6">
-                {session && (
-                  <>
-                    <Link
-                      href="/"
-                      className="text-gray-700 hover:text-blue-600 transition"
-                    >
-                      Home
-                    </Link>
-                    <Link
-                      href="/dashboard"
-                      className="text-gray-700 hover:text-blue-600 transition"
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      href="/chat"
-                      className="text-gray-700 hover:text-blue-600 transition"
-                    >
-                      AI Chat
-                    </Link>
-                  </>
-                )}
-              </div>
+              {/* Desktop Nav Links */}
+              {session && (
+                <div className="hidden md:flex gap-6">
+                  <Link
+                    href="/"
+                    className="text-gray-700 hover:text-blue-600 transition"
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    href="/dashboard"
+                    className="text-gray-700 hover:text-blue-600 transition"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/chat"
+                    className="text-gray-700 hover:text-blue-600 transition"
+                  >
+                    AI Chat
+                  </Link>
+                </div>
+              )}
 
               {/* Right side: Notifications and User Menu */}
               <div className="flex items-center space-x-2">
                 {session && <NotificationBadge />}
                 <UserMenu />
+
+                {/* Mobile Menu Button */}
+                {session && (
+                  <button
+                    className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+                    aria-label="Toggle menu"
+                    onClick={() => {
+                      const menu = document.getElementById("mobile-menu");
+                      if (menu) {
+                        menu.classList.toggle("hidden");
+                      }
+                    }}
+                  >
+                    <Menu className="h-6 w-6 text-gray-700" />
+                  </button>
+                )}
               </div>
             </nav>
+
+            {/* Mobile Nav Dropdown */}
+            {session && (
+              <div
+                id="mobile-menu"
+                className="md:hidden hidden flex-col space-y-2 px-4 pb-4 bg-white border-t"
+              >
+                <Link
+                  href="/"
+                  className="block text-gray-700 hover:text-blue-600 transition"
+                >
+                  Home
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="block text-gray-700 hover:text-blue-600 transition"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/chat"
+                  className="block text-gray-700 hover:text-blue-600 transition"
+                >
+                  AI Chat
+                </Link>
+              </div>
+            )}
           </header>
 
           {/* Page Content */}
-          <main className="container mx-auto p-6">{children}</main>
+          <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {children}
+          </main>
         </Providers>
       </body>
     </html>
