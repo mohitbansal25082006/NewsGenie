@@ -61,31 +61,36 @@ export default async function RootLayout({
                 </Link>
               </div>
 
-              {/* Mobile Menu Toggle */}
-              <input
-                type="checkbox"
-                id="menu-toggle"
-                className="hidden peer"
-              />
-              <label
-                htmlFor="menu-toggle"
-                className="md:hidden block cursor-pointer"
-              >
-                <svg
-                  className="w-6 h-6 text-gray-700"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
+              {/* Mobile Menu Toggle - ONLY show when user is logged in */}
+              {session && (
+                <>
+                  <input
+                    type="checkbox"
+                    id="menu-toggle"
+                    className="hidden peer"
                   />
-                </svg>
-              </label>
+                  <label
+                    htmlFor="menu-toggle"
+                    className="md:hidden block cursor-pointer"
+                    aria-label="Open navigation"
+                  >
+                    <svg
+                      className="w-6 h-6 text-gray-700"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 6h16M4 12h16M4 18h16"
+                      />
+                    </svg>
+                  </label>
+                </>
+              )}
 
               {/* Nav Links */}
               <div className="w-full md:flex md:items-center md:w-auto hidden peer-checked:flex flex-col md:flex-row md:gap-6 mt-2 md:mt-0">
@@ -116,7 +121,7 @@ export default async function RootLayout({
               {/* Right side: Notifications and User Menu */}
               <div className="flex items-center space-x-2 mt-2 md:mt-0">
                 {session && <NotificationBadge />}
-                {/* Always render UserMenu */}
+                {/* Always render UserMenu (handles signed-in and signed-out states) */}
                 <UserMenu />
               </div>
             </nav>

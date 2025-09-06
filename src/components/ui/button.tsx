@@ -1,5 +1,5 @@
 // E:\newsgenie\src\components\ui\button.tsx
-"use client"; // ⚠️ Make this a client component
+"use client";
 
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
@@ -54,7 +54,7 @@ function Button({
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
+      {...(props as any)}
     />
   );
 }

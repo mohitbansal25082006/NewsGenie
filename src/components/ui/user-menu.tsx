@@ -19,6 +19,7 @@ export function UserMenu() {
 
   const handleSignIn = async (provider: string) => {
     try {
+      // This will redirect to provider's signin flow
       await signIn(provider, { callbackUrl: "/dashboard" });
       toast.success("Signing you in...");
     } catch (error) {
@@ -30,18 +31,20 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {session ? (
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={session.user.image || ""} alt={session.user.name || ""} />
-              <AvatarFallback>
-                {session.user.name?.charAt(0).toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
+          // If logged in: show avatar button
+          <Button variant="ghost" className="relative h-8 w-8 rounded-full" asChild>
+            <div className="relative h-8 w-8 rounded-full overflow-hidden">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={session.user?.image || ""} alt={session.user?.name || ""} />
+                <AvatarFallback>
+                  {session.user?.name?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+            </div>
           </Button>
         ) : (
-          <Button variant="outline" size="sm">
-            Sign In
-          </Button>
+          // If logged out: show Sign In button which opens the same dropdown
+          <Button variant="outline" size="sm">Sign In</Button>
         )}
       </DropdownMenuTrigger>
 
@@ -50,8 +53,8 @@ export function UserMenu() {
           <>
             <div className="flex items-center justify-start gap-2 p-2">
               <div className="flex flex-col space-y-1 leading-none">
-                {session.user.name && <p className="font-medium">{session.user.name}</p>}
-                {session.user.email && (
+                {session.user?.name && <p className="font-medium">{session.user.name}</p>}
+                {session.user?.email && (
                   <p className="w-[200px] truncate text-sm text-muted-foreground">{session.user.email}</p>
                 )}
               </div>
@@ -59,26 +62,34 @@ export function UserMenu() {
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/dashboard">
-                <User className="mr-2 h-4 w-4" />
-                <span>Dashboard</span>
+                <div className="flex items-center gap-2">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Dashboard</span>
+                </div>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/chat">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                <span>AI Chat</span>
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  <span>AI Chat</span>
+                </div>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/dashboard/notifications">
-                <Bell className="mr-2 h-4 w-4" />
-                <span>Notifications</span>
+                <div className="flex items-center gap-2">
+                  <Bell className="mr-2 h-4 w-4" />
+                  <span>Notifications</span>
+                </div>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/dashboard/preferences">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Preferences</span>
+                <div className="flex items-center gap-2">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Preferences</span>
+                </div>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
