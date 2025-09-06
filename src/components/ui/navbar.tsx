@@ -18,9 +18,9 @@ export default function Navbar({ session }: NavbarProps) {
 
   return (
     <header className="w-full border-b bg-white shadow-sm sticky top-0 z-50">
-      <nav className="container mx-auto flex items-center justify-between p-4">
+      <nav className="container mx-auto flex flex-wrap items-center justify-between p-4 gap-2">
         {/* Logo / Brand */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 flex-shrink-0">
           <Link href="/" className="flex items-center space-x-3">
             <Image
               src="/logo.png"
@@ -29,77 +29,91 @@ export default function Navbar({ session }: NavbarProps) {
               height={72}
               className="rounded-md w-12 h-12 sm:w-16 sm:h-16"
             />
-            <div className="text-2xl sm:text-3xl font-bold text-blue-600">
+            <div className="text-2xl sm:text-3xl font-bold text-blue-600 whitespace-nowrap">
               NewsGenie
             </div>
           </Link>
         </div>
 
-        {/* Desktop Nav */}
-        {session && (
-          <div className="hidden md:flex gap-6">
+        {/* Desktop Nav / Auth Buttons */}
+        <div className="flex items-center space-x-3 flex-wrap justify-end flex-1">
+          {session ? (
+            <>
+              <div className="hidden md:flex gap-6">
+                <Link
+                  href="/"
+                  className="text-gray-700 hover:text-blue-600 transition"
+                >
+                  Home
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="text-gray-700 hover:text-blue-600 transition"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/chat"
+                  className="text-gray-700 hover:text-blue-600 transition"
+                >
+                  AI Chat
+                </Link>
+              </div>
+              <div className="flex items-center space-x-2">
+                <NotificationBadge />
+                <UserMenu />
+                {/* Mobile Menu Button */}
+                <button
+                  className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+                  aria-label="Toggle menu"
+                  onClick={() => setMobileOpen((prev) => !prev)}
+                >
+                  <Menu className="h-6 w-6 text-gray-700" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex gap-2 flex-wrap justify-end w-full md:w-auto">
+              <Link
+                href="/auth/google"
+                className="flex items-center justify-center px-4 py-2 bg-black text-white rounded-md text-sm whitespace-nowrap"
+              >
+                Continue with Google
+              </Link>
+              <Link
+                href="/auth/github"
+                className="flex items-center justify-center px-4 py-2 border border-black rounded-md text-sm whitespace-nowrap"
+              >
+                Continue with GitHub
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Nav for Logged-in Users */}
+        {session && mobileOpen && (
+          <div className="md:hidden w-full flex flex-col space-y-2 mt-2 bg-white border-t px-4 pb-4">
             <Link
               href="/"
-              className="text-gray-700 hover:text-blue-600 transition"
+              className="block text-gray-700 hover:text-blue-600 transition"
             >
               Home
             </Link>
             <Link
               href="/dashboard"
-              className="text-gray-700 hover:text-blue-600 transition"
+              className="block text-gray-700 hover:text-blue-600 transition"
             >
               Dashboard
             </Link>
             <Link
               href="/chat"
-              className="text-gray-700 hover:text-blue-600 transition"
+              className="block text-gray-700 hover:text-blue-600 transition"
             >
               AI Chat
             </Link>
           </div>
         )}
-
-        {/* Right side */}
-        <div className="flex items-center space-x-2">
-          {session && <NotificationBadge />}
-          <UserMenu />
-
-          {/* Mobile Menu Button */}
-          {session && (
-            <button
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
-              aria-label="Toggle menu"
-              onClick={() => setMobileOpen((prev) => !prev)}
-            >
-              <Menu className="h-6 w-6 text-gray-700" />
-            </button>
-          )}
-        </div>
       </nav>
-
-      {/* Mobile Nav */}
-      {session && mobileOpen && (
-        <div className="md:hidden flex flex-col space-y-2 px-4 pb-4 bg-white border-t">
-          <Link
-            href="/"
-            className="block text-gray-700 hover:text-blue-600 transition"
-          >
-            Home
-          </Link>
-          <Link
-            href="/dashboard"
-            className="block text-gray-700 hover:text-blue-600 transition"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/chat"
-            className="block text-gray-700 hover:text-blue-600 transition"
-          >
-            AI Chat
-          </Link>
-        </div>
-      )}
     </header>
   );
 }
