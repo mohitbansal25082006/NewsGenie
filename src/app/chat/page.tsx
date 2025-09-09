@@ -62,7 +62,11 @@ interface TopicExploration {
 interface BriefingData {
   briefing: string;
   articlesCount: number;
-  latestArticleDate: string;
+  latestArticleDate: string | null;
+  generatedAt: string;
+  sources: string[];
+  categories: string[];
+  timeRange: string;
 }
 
 export default function ChatPage() {
@@ -266,7 +270,7 @@ export default function ChatPage() {
         setBriefing(data);
         setActiveTab('briefing');
       } else {
-        console.error('Failed to generate briefing');
+        console.error('Failed to generate briefing:', await response.text());
         toast.error('Failed to generate briefing');
       }
     } catch (error) {
@@ -357,41 +361,6 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const formatBriefingContent = (content: string) => {
-    // Split content into sections based on double line breaks
-    const sections = content.split('\n\n').filter(section => section.trim());
-    
-    return sections.map((section, index) => {
-      // Check if section is a heading (starts with # or **)
-      if (section.startsWith('# ') || section.startsWith('## ')) {
-        const level = section.startsWith('# ') ? 'text-xl' : 'text-lg';
-        const text = section.replace(/^#+\s*/, '');
-        return (
-          <h2 key={index} className={`font-bold ${level} mt-6 mb-3 text-gray-800`}>
-            {text}
-          </h2>
-        );
-      }
-      
-      // Check if section is a subheading (starts with **)
-      if (section.startsWith('**') && section.endsWith('**')) {
-        const text = section.replace(/\*\*/g, '');
-        return (
-          <h3 key={index} className="font-semibold text-md mt-4 mb-2 text-gray-700">
-            {text}
-          </h3>
-        );
-      }
-      
-      // Regular paragraph
-      return (
-        <p key={index} className="mb-4 text-gray-700 leading-relaxed">
-          {section}
-        </p>
-      );
-    });
   };
 
   if (status === 'loading') {
@@ -836,7 +805,7 @@ export default function ChatPage() {
                       <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                         <div className="flex items-center text-sm text-blue-800">
                           <FileText className="h-4 w-4 mr-2" />
-                          <span>Generated on {format(new Date(), 'MMMM d, yyyy at h:mm a')}</span>
+                          <span>Generated on {format(new Date(briefing.generatedAt), 'MMMM d, yyyy at h:mm a')}</span>
                         </div>
                         <div className="flex items-center text-sm text-blue-700 mt-1">
                           <span>Based on {briefing.articlesCount} latest articles</span>
@@ -847,10 +816,15 @@ export default function ChatPage() {
                             </>
                           )}
                         </div>
+                        <div className="flex items-center text-sm text-blue-700 mt-1">
+                          <span>Categories: {briefing.categories.join(', ')}</span>
+                        </div>
                       </div>
                       
-                      <div className="prose max-w-none">
-                        {formatBriefingContent(briefing.briefing)}
+                      <div className="prose prose-sm max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {briefing.briefing}
+                        </ReactMarkdown>
                       </div>
                     </div>
                   ) : (

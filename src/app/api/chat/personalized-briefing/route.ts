@@ -14,7 +14,6 @@ interface NewsApiSource {
   id?: string | null;
   name: string;
 }
-
 interface NewsApiArticle {
   source: NewsApiSource;
   author?: string | null;
@@ -25,7 +24,6 @@ interface NewsApiArticle {
   publishedAt?: string | null;
   content?: string | null;
 }
-
 interface NewsApiResponse {
   status: 'ok' | 'error';
   totalResults?: number;
@@ -103,8 +101,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Type assertion to match our interface
     const userWithPrefs = user as unknown as UserWithPreferences;
     
+    // If user preferences don't exist, create default preferences
     if (!userWithPrefs.userPreference) {
-      return NextResponse.json({ error: 'User preferences not found' }, { status: 404 });
+      try {
+        await db.userPreference.create({
+          data: {
+            userId: userWithPrefs.id,
+            interests: ['general', 'technology', 'business'],
+            country: 'us',
+            language: 'en',
+          },
+        });
+        
+        // Refetch user with preferences
+        const updatedUser = await db.user.findUnique({
+          where: { id: session.user.id },
+          include: { userPreference: true },
+        });
+        
+        if (!updatedUser?.userPreference) {
+          return NextResponse.json({ error: 'Failed to create user preferences' }, { status: 500 });
+        }
+        
+        // Update the user with preferences
+        userWithPrefs.userPreference = updatedUser.userPreference;
+      } catch (error) {
+        console.error('Error creating user preferences:', error);
+        return NextResponse.json({ error: 'Failed to create user preferences' }, { status: 500 });
+      }
     }
 
     const { searchParams } = new URL(request.url);
@@ -162,8 +186,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Type assertion to match our interface
     const userWithPrefs = user as unknown as UserWithPreferences;
     
+    // If user preferences don't exist, create default preferences
     if (!userWithPrefs.userPreference) {
-      return NextResponse.json({ error: 'User preferences not found' }, { status: 404 });
+      try {
+        await db.userPreference.create({
+          data: {
+            userId: userWithPrefs.id,
+            interests: ['general', 'technology', 'business'],
+            country: 'us',
+            language: 'en',
+          },
+        });
+        
+        // Refetch user with preferences
+        const updatedUser = await db.user.findUnique({
+          where: { id: session.user.id },
+          include: { userPreference: true },
+        });
+        
+        if (!updatedUser?.userPreference) {
+          return NextResponse.json({ error: 'Failed to create user preferences' }, { status: 500 });
+        }
+        
+        // Update the user with preferences
+        userWithPrefs.userPreference = updatedUser.userPreference;
+      } catch (error) {
+        console.error('Error creating user preferences:', error);
+        return NextResponse.json({ error: 'Failed to create user preferences' }, { status: 500 });
+      }
     }
 
     const briefing = await generatePersonalizedBriefingInternal(
@@ -268,7 +318,6 @@ function formatBriefingAsHtml(briefingResp: BriefingResponse): NextResponse {
 </body>
 </html>
   `;
-
   return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
 }
 
@@ -526,7 +575,7 @@ async function generatePersonalizedBriefingInternal(
   } catch (error) {
     console.error('Error in generatePersonalizedBriefingInternal:', error);
     return {
-      briefing: `I apologize, but I'm currently unable to generate your personalized briefing.`,
+      briefing: `I apologize, but I'm currently unable to generate your personalized briefing. Please try again later.`,
       articlesCount: 0,
       latestArticleDate: null,
       sources: [],
