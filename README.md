@@ -1,6 +1,6 @@
 # NewsGenie - AI-Powered News Aggregator
 
-![NewsGenie Banner](https://via.placeholder.com/1200x400?text=NewsGenie+-+AI-Powered+News+Aggregator)
+![NewsGenie Banner](./banner.png)
 
 <div align="center">
   
@@ -12,6 +12,8 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat&logo=openai&logoColor=white)](https://openai.com/)
 
 </div>
+
+👉 **Check it out here:** [![Live Demo](https://img.shields.io/badge/Live%20Demo-NewsGenie-blue?style=for-the-badge&logo=vercel)](https://newsgenie-psi.vercel.app/)
 
 ## 📖 Table of Contents
 
@@ -931,29 +933,8 @@ SOFTWARE.
 - **News API** for providing comprehensive news data
 - All contributors and users who have helped improve NewsGenie
 
-## 📞 Support
-
-If you encounter any issues or have questions:
-
-1. **Check the Documentation**: Make sure to read through this README thoroughly
-2. **Search Existing Issues**: Check if your question has been asked before
-3. **Create a New Issue**: If you can't find an answer, create a new issue on GitHub
-4. **Join Our Community**: Connect with other users and developers
-
-### Contact Information
-
-- **GitHub Issues**: [Create an issue](https://github.com/your-username/newsgenie/issues)
-- **Email**: support@newsgenie.com
-- **Discord**: [Join our Discord server](https://discord.gg/newsgenie)
-
----
-
 <div align="center">
   
-**Made with ❤️ by the NewsGenie Team**
-
-[![Website](https://img.shields.io/badge/Website-Visit-blue?style=flat&logo=vercel&logoColor=white)](https://newsgenie.com)
-[![Twitter](https://img.shields.io/badge/Twitter-Follow-blue?style=flat&logo=twitter&logoColor=white)](https://twitter.com/newsgenie)
-[![Discord](https://img.shields.io/badge/Discord-Join-purple?style=flat&logo=discord&logoColor=white)](https://discord.gg/newsgenie)
+**Made with ❤️ by Mohit Bansal**
 
 </div>
